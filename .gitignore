@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.DS_Store
+# Nunca suba al repositorio el código del servidor ni datos:
+apps-script/
+*.gs
+*.xlsx
+*.csv

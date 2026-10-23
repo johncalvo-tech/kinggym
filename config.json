@@ -1,0 +1,5 @@
+{
+  "API_URL": "https://script.google.com/macros/s/PEGUE_AQUI_EL_ID/exec",
+  "NOMBRE": "KING GYM",
+  "DOMINIOS_PERMITIDOS": ["TU-USUARIO.github.io"]
+}
