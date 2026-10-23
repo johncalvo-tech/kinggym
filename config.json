@@ -1,5 +1,7 @@
 {
   "API_URL": "https://script.google.com/macros/s/AKfycbxr2A7wv6eRAsikrADQvVvSnpPH7q0ta6C5lhgnh0mBnjI698KcxoILX4keJ7dTRthy/exec",
-  "NOMBRE": "KING GYM",
-  "DOMINIOS_PERMITIDOS": ["johncalvo-tech.github.io"]
+  "DOMINIOS_PERMITIDOS": [
+    "johncalvo-tech.github.io"
+  ],
+  "NOMBRE": "KING GYM"
 }
