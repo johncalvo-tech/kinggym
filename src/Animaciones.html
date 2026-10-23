@@ -1,0 +1,288 @@
+<style>
+  .anim { --an-fig:#1f1f1f; --an-fig2:#a3a3a3; --an-eq:#5b6472; --an-eq2:#d5d9df; --an-piso:#d9d9d9; --an-acento:#d99a00; --an-fondo:#f6f6f6;
+          background:var(--an-fondo); border-radius:10px; overflow:hidden; position:relative; }
+  .tema-oscuro .anim { --an-fig:#FFC000; --an-fig2:#7d6200; --an-eq:#a1a8b3; --an-eq2:#34383e; --an-piso:#2e2e2e; --an-acento:#ffffff; --an-fondo:#0f0f0f; }
+  .anim svg { display:block; width:100%; height:100%; }
+</style>
+<script>
+/* =====================================================================
+ *  ANIMACIONES DE EJERCICIOS — figura articulada en SVG (sin librerías)
+ *  Ángulos en grados: 0 = hacia abajo, 90 = hacia adelante (derecha),
+ *  180 = hacia arriba, -90 = hacia atrás (izquierda).
+ *  Sufijo 1 = extremidad cercana (color fuerte), 2 = lejana (color suave).
+ * ===================================================================== */
+var Anim = (function () {
+  var PISO = 110, W = 160, H = 120;
+  var L = { tor: 30, cuello: 9, cab: 6.5, br: 16, ant: 15, mus: 20, pier: 20, pie: 7, hom: 9, cad: 6 };
+  var BASE = { t: 180, c: 0, sube: 0, ua: 0, fa: 0, th: 0, sh: 0 };
+  var PARES = ['ua', 'fa', 'th', 'sh', 'f'];
+
+  function dir(a) { var r = a * Math.PI / 180; return [Math.sin(r), Math.cos(r)]; }
+  function mas(p, a, l) { var d = dir(a); return [p[0] + d[0] * l, p[1] + d[1] * l]; }
+
+  function ang(dx, dy) { return Math.atan2(dx, dy) * 180 / Math.PI; }
+  function ik(t, a, b, signo) {
+    var d = Math.max(0.01, Math.min(a + b - 0.05, Math.hypot(t[0], t[1])));
+    var base = ang(t[0], t[1]);
+    var c = (a * a + d * d - b * b) / (2 * a * d);
+    var alfa = Math.acos(Math.max(-1, Math.min(1, c))) * 180 / Math.PI;
+    var a1 = base + signo * alfa, j = mas([0, 0], a1, a);
+    return [a1, ang(t[0] - j[0], t[1] - j[1])];
+  }
+
+  // Completa una pose con valores por defecto y separa extremidades 1/2
+  function normalizar(p, def) {
+    var o = {}, k;
+    for (k in BASE) o[k] = BASE[k];
+    for (k in p) o[k] = p[k];
+    ['pie', 'mano', 'rod', 'cod'].forEach(function (n) {
+      if (o[n + '1'] == null && o[n] != null) o[n + '1'] = o[n];
+      if (o[n + '2'] == null && o[n + '1'] != null) o[n + '2'] = o[n + '1'];
+    });
+    PARES.forEach(function (n) {
+      if (o[n + '1'] == null) o[n + '1'] = o[n] != null ? o[n] : (n === 'f' ? null : 0);
+      if (o[n + '2'] == null) o[n + '2'] = o[n + '1'];
+    });
+    if (def.brazosRel) ['ua1', 'ua2', 'fa1', 'fa2'].forEach(function (n) { o[n] += o.t - 180; });
+    return o;
+  }
+
+  function mezclar(a, b, u) {
+    var o = {};
+    for (var k in a) {
+      if (typeof a[k] === 'number' && typeof b[k] === 'number') o[k] = a[k] + (b[k] - a[k]) * u;
+      else if (Array.isArray(a[k]) && Array.isArray(b[k])) o[k] = [a[k][0] + (b[k][0] - a[k][0]) * u, a[k][1] + (b[k][1] - a[k][1]) * u];
+      else o[k] = u < 0.5 ? a[k] : b[k];
+    }
+    return o;
+  }
+
+  // Calcula posiciones de todas las articulaciones
+  function esqueleto(P, def) {
+    var J = {};
+    if (def.vista === 'frente') {
+      var c = [0, 0], cuelloF = [0, -L.tor];
+      J.cad = c; J.cue = cuelloF; J.cab = [0, -L.tor - L.cuello];
+      [1, -1].forEach(function (s, i) {
+        var n = i ? 2 : 1;
+        var h = [s * L.hom, -L.tor + 2], hp = [s * L.cad, 0];
+        var ua = P['ua' + n], fa = P['fa' + n], th = P['th' + n], sh = P['sh' + n];
+        J['h' + n] = h;
+        J['e' + n] = [h[0] + s * dir(ua)[0] * L.br, h[1] + dir(ua)[1] * L.br];
+        J['w' + n] = [J['e' + n][0] + s * dir(fa)[0] * L.ant, J['e' + n][1] + dir(fa)[1] * L.ant];
+        J['hp' + n] = hp;
+        J['k' + n] = [hp[0] + s * dir(th)[0] * L.mus, hp[1] + dir(th)[1] * L.mus];
+        J['a' + n] = [J['k' + n][0] + s * dir(sh)[0] * L.pier, J['k' + n][1] + dir(sh)[1] * L.pier];
+        J['p' + n] = [J['a' + n][0] + s * 5, J['a' + n][1]];
+      });
+    } else {
+      var cad = [0, 0], hom = mas(cad, P.t, L.tor);
+      J.cad = cad; J.cue = hom; J.cab = mas(hom, P.t + P.c, L.cuello);
+      [1, 2].forEach(function (n) {
+        // Cinemática inversa: pie relativo a la cadera, mano relativa al hombro
+        if (P['pie' + n]) { var r = ik(P['pie' + n], L.mus, L.pier, P['rod' + n] != null ? P['rod' + n] : 1); P['th' + n] = r[0]; P['sh' + n] = r[1]; }
+        if (P['mano' + n]) { var m = ik(P['mano' + n], L.br, L.ant, P['cod' + n] != null ? P['cod' + n] : -1); P['ua' + n] = m[0]; P['fa' + n] = m[1]; }
+        J['h' + n] = hom; J['hp' + n] = cad;
+        J['e' + n] = mas(hom, P['ua' + n], L.br);
+        J['w' + n] = mas(J['e' + n], P['fa' + n], L.ant);
+        J['k' + n] = mas(cad, P['th' + n], L.mus);
+        J['a' + n] = mas(J['k' + n], P['sh' + n], L.pier);
+        var f = P['f' + n] != null ? P['f' + n] : P['sh' + n] + 90;
+        J['p' + n] = mas(J['a' + n], f, L.pie);
+      });
+    }
+    // Ubicación en la escena
+    var dx = 0, dy = 0, an = def.ancla || 'pie', x = def.x != null ? def.x : 80;
+    if (an === 'cadera') { dx = x; dy = def.y; }
+    else if (an === 'mano') { dx = def.x - J.w1[0]; dy = def.y - J.w1[1]; }
+    else if (an === 'pieFijo') { dx = def.x - J.a1[0]; dy = def.y - J.a1[1]; }
+    else {
+      var piso = def.piso != null ? def.piso : PISO, bajo = -1e9;
+      ['k1', 'k2', 'a1', 'a2', 'p1', 'p2', 'w1', 'w2', 'cad', 'e1', 'e2'].forEach(function (k) { if (J[k][1] > bajo) bajo = J[k][1]; });
+      bajo = Math.max(bajo, J.cab[1] + L.cab, J.cue[1] + 3);
+      dy = piso - bajo - (P.sube || 0);
+      dx = x - (an === 'cuerpo' ? J.cad[0] : J.a1[0]);
+    }
+    for (var k in J) J[k] = [J[k][0] + dx, J[k][1] + dy];
+    return J;
+  }
+
+  function ln(a, b, color, w, extra) {
+    return '<line x1="' + a[0].toFixed(1) + '" y1="' + a[1].toFixed(1) + '" x2="' + b[0].toFixed(1) + '" y2="' + b[1].toFixed(1) +
+      '" style="stroke:var(' + color + ')" stroke-width="' + w + '" stroke-linecap="round"' + (extra || '') + '/>';
+  }
+  function cir(p, r, color, extra) { return '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="' + r + '" style="fill:var(' + color + ')"' + (extra || '') + '/>'; }
+  function rect(x, y, w, h, color, rx) { return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="' + (rx || 1.5) + '" style="fill:var(' + color + ')"/>'; }
+
+  function mancuerna(p) {
+    return ln([p[0] - 4.5, p[1]], [p[0] + 4.5, p[1]], '--an-eq', 2.2) + rect(p[0] - 7, p[1] - 3.5, 3, 7, '--an-eq', 1) + rect(p[0] + 4, p[1] - 3.5, 3, 7, '--an-eq', 1);
+  }
+
+  // Accesorios
+  function accesorio(a, J, P, fase, atras) {
+    var t = a.tipo, s = '';
+    if (!!a.atras !== atras) return '';
+    switch (t) {
+      case 'banco':
+        s += rect(a.x, a.y, a.w, a.h || 5, '--an-eq', 2);
+        if (!a.sinPatas) { s += ln([a.x + 5, a.y + 3], [a.x + 5, PISO], '--an-eq', 2.5) + ln([a.x + a.w - 5, a.y + 3], [a.x + a.w - 5, PISO], '--an-eq', 2.5); }
+        break;
+      case 'linea': s += ln([a.x1, a.y1], [a.x2, a.y2], a.color || '--an-eq', a.w || 4); break;
+      case 'caja': s += rect(a.x, a.y, a.w, a.h, '--an-eq2', 2) + '<rect x="' + a.x + '" y="' + a.y + '" width="' + a.w + '" height="' + a.h + '" rx="2" fill="none" style="stroke:var(--an-eq)" stroke-width="1.5"/>'; break;
+      case 'colchoneta': s += rect(a.x, PISO - 3, a.w, 3, '--an-eq2', 1.5); break;
+      case 'barra':
+        var pb = a.en === 'espalda' ? [J.cue[0] - 7, J.cue[1] + 2] : a.en === 'cadera' ? [J.cad[0] + 2, J.cad[1] - 6] : J.w1;
+        s += cir(pb, 9.5, '--an-eq2') + '<circle cx="' + pb[0].toFixed(1) + '" cy="' + pb[1].toFixed(1) + '" r="9.5" fill="none" style="stroke:var(--an-eq)" stroke-width="2"/>' + cir(pb, 2.2, '--an-eq');
+        break;
+      case 'mancuernas': s += mancuerna(J.w2) + mancuerna(J.w1); break;
+      case 'mancuerna': s += mancuerna(J.w1); break;
+      case 'kettlebell':
+        var pk = [J.w1[0], J.w1[1] + 6];
+        s += '<path d="M' + (pk[0] - 4) + ' ' + (pk[1] - 1) + ' Q' + pk[0] + ' ' + (pk[1] - 8) + ' ' + (pk[0] + 4) + ' ' + (pk[1] - 1) + '" fill="none" style="stroke:var(--an-eq)" stroke-width="2"/>' + cir([pk[0], pk[1] + 3], 5.5, '--an-eq');
+        break;
+      case 'polea':
+        s += ln([a.x, a.y], J.w1, '--an-eq', 1.2) + cir([a.x, a.y], 3.5, '--an-eq');
+        if (a.poste) s += ln([a.px, 4], [a.px, PISO], '--an-eq', 4) + ln([a.px, a.y], [a.x, a.y], '--an-eq', 2.5);
+        if (a.barraMano) s += ln([J.w1[0] - 9, J.w1[1]], [J.w1[0] + 9, J.w1[1]], '--an-eq', 2.5);
+        break;
+      case 'banda': s += ln([a.x, a.y], J.w1, '--an-acento', 1.6, ' stroke-dasharray="0"') + rect(a.x - 2, a.y - 4, 4, 8, '--an-eq', 1); break;
+      case 'barraFija': s += ln([a.x1, a.y], [a.x2, a.y], '--an-eq', 3.5) + ln([a.x1 + 3, a.y], [a.x1 + 3, 0], '--an-eq', 2.5) + ln([a.x2 - 3, a.y], [a.x2 - 3, 0], '--an-eq', 2.5); break;
+      case 'paralelas': s += ln([a.x1, a.y], [a.x2, a.y], '--an-eq', 3.5) + ln([a.x1 + 4, a.y], [a.x1 + 4, PISO], '--an-eq', 2.5) + ln([a.x2 - 4, a.y], [a.x2 - 4, PISO], '--an-eq', 2.5); break;
+      case 'rodillo': var pr = J[a.en || 'a1']; s += cir([pr[0] + (a.dx || 0), pr[1] + (a.dy || 0)], 3.6, '--an-eq'); break;
+      case 'plataforma':
+        var pp = J.a1, d = dir(a.ang), q1 = [pp[0] + d[0] * 13, pp[1] + d[1] * 13], q2 = [pp[0] - d[0] * 13, pp[1] - d[1] * 13];
+        var off = dir(a.ang + 90);
+        s += ln([q1[0] + off[0] * 4, q1[1] + off[1] * 4], [q2[0] + off[0] * 4, q2[1] + off[1] * 4], '--an-eq', 4);
+        break;
+      case 'cuerda':
+        // La cuerda gira alrededor del cuerpo: se dibuja como un arco que cambia de lado
+        var ang = fase * 360 * (a.vueltas || 1), cc = [J.cad[0], J.cad[1] - 10], R = 62, d1 = dir(ang - 28), d2 = dir(ang + 28);
+        var c1 = [cc[0] + d1[0] * R, cc[1] + d1[1] * R], c2 = [cc[0] + d2[0] * R, cc[1] + d2[1] * R];
+        s += '<path d="M' + J.w1[0].toFixed(1) + ' ' + J.w1[1].toFixed(1) + ' C' + c1[0].toFixed(1) + ' ' + c1[1].toFixed(1) + ' ' + c2[0].toFixed(1) + ' ' + c2[1].toFixed(1) + ' ' + J.w2[0].toFixed(1) + ' ' + J.w2[1].toFixed(1) + '" fill="none" style="stroke:var(--an-eq)" stroke-width="1.6"/>';
+        break;
+      case 'rueda':
+        s += '<circle cx="' + a.x + '" cy="' + a.y + '" r="' + a.r + '" fill="none" style="stroke:var(--an-eq)" stroke-width="2.5"/>' + cir([a.x, a.y], 2.5, '--an-eq');
+        break;
+    }
+    return s;
+  }
+
+  function figura(J, def) {
+    var s = '';
+    if (def.vista === 'frente') {
+      [2, 1].forEach(function (n) {
+        s += ln(J['hp' + n], J['k' + n], '--an-fig', 6) + ln(J['k' + n], J['a' + n], '--an-fig', 5.5) + ln(J['a' + n], J['p' + n], '--an-fig', 4);
+      });
+      s += ln([J.hp1[0], J.hp1[1]], [J.hp2[0], J.hp2[1]], '--an-fig', 8);
+      s += '<path d="M' + J.hp2[0].toFixed(1) + ' ' + J.hp2[1].toFixed(1) + ' L' + J.h2[0].toFixed(1) + ' ' + J.h2[1].toFixed(1) + ' L' + J.h1[0].toFixed(1) + ' ' + J.h1[1].toFixed(1) + ' L' + J.hp1[0].toFixed(1) + ' ' + J.hp1[1].toFixed(1) + ' Z" style="fill:var(--an-fig);stroke:var(--an-fig)" stroke-width="5" stroke-linejoin="round"/>';
+      [2, 1].forEach(function (n) {
+        s += ln(J['h' + n], J['e' + n], '--an-fig', 5.5) + ln(J['e' + n], J['w' + n], '--an-fig', 5) + cir(J['w' + n], 3, '--an-fig');
+      });
+      s += ln(J.cue, J.cab, '--an-fig', 4) + cir(J.cab, L.cab, '--an-fig');
+      return s;
+    }
+    // Lejanas detrás, cercanas adelante
+    s += ln(J.cad, J.k2, '--an-fig2', 6.5) + ln(J.k2, J.a2, '--an-fig2', 6) + ln(J.a2, J.p2, '--an-fig2', 4.5);
+    s += ln(J.h2, J.e2, '--an-fig2', 5.5) + ln(J.e2, J.w2, '--an-fig2', 5) + cir(J.w2, 3, '--an-fig2');
+    s += ln(J.cad, J.cue, '--an-fig', 9.5) + ln(J.cue, J.cab, '--an-fig', 4) + cir(J.cab, L.cab, '--an-fig');
+    s += ln(J.cad, J.k1, '--an-fig', 6.5) + ln(J.k1, J.a1, '--an-fig', 6) + ln(J.a1, J.p1, '--an-fig', 4.5);
+    return s;
+  }
+  function brazoCercano(J) { return ln(J.h1, J.e1, '--an-fig', 5.5) + ln(J.e1, J.w1, '--an-fig', 5) + cir(J.w1, 3, '--an-fig'); }
+
+  function ease(u) { return 0.5 - 0.5 * Math.cos(Math.PI * u); }
+
+  function poseEn(def, fase) {
+    if (!def._F) def._F = def.f.map(function (p) { return normalizar(p, def); });
+    var F = def._F, seq;
+    if (F.length === 1) return F[0];
+    if (def.modo === 'ciclo') seq = F.concat([F[0]]);
+    else { seq = F.slice(); for (var i = F.length - 2; i >= 0; i--) seq.push(F[i]); }
+    var S = seq.length - 1, x = fase * S, i0 = Math.min(S - 1, Math.floor(x));
+    return mezclar(seq[i0], seq[i0 + 1], ease(x - i0));
+  }
+
+  function svg(def, fase) {
+    var P = poseEn(def, fase), J = esqueleto(P, def), props = def.props || [], s = '';
+    s += '<svg viewBox="0 -16 ' + W + ' ' + (H + 16) + '" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">';
+    s += ln([4, PISO + 1.5], [W - 4, PISO + 1.5], '--an-piso', 3);
+    props.forEach(function (a) { s += accesorio(a, J, P, fase, true); });
+    s += figura(J, def);
+    props.forEach(function (a) { if (a.tipo !== 'barra' && a.tipo !== 'mancuernas' && a.tipo !== 'mancuerna' && a.tipo !== 'kettlebell' && a.tipo !== 'polea' && a.tipo !== 'banda' && a.tipo !== 'cuerda') s += accesorio(a, J, P, fase, false); });
+    if (def.vista !== 'frente') s += brazoCercano(J);
+    props.forEach(function (a) { if (a.tipo === 'barra' || a.tipo === 'mancuernas' || a.tipo === 'mancuerna' || a.tipo === 'kettlebell' || a.tipo === 'polea' || a.tipo === 'banda' || a.tipo === 'cuerda') s += accesorio(a, J, P, fase, false); });
+    return s + '</svg>';
+  }
+
+  /* ---------- catálogo y búsqueda ---------- */
+  function n(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim(); }
+
+  function buscar(nombre, clave) {
+    var cat = window.ANIM_CATALOGO || [];
+    if (clave === '-') return null;
+    if (clave) { var d = cat.filter(function (x) { return x.id === clave; })[0]; if (d) return variante(d, nombre); }
+    var nn = n(nombre);
+    if (!nn) return null;
+    for (var i = 0; i < cat.length; i++) {
+      for (var j = 0; j < cat[i].claves.length; j++) if (nn.indexOf(cat[i].claves[j]) >= 0) return variante(cat[i], nombre);
+    }
+    return null;
+  }
+
+  // Cambia barra <-> mancuernas según el nombre del ejercicio
+  function variante(def, nombre) {
+    var nn = n(nombre), cambio = null;
+    var tieneBarra = (def.props || []).some(function (p) { return p.tipo === 'barra' && !p.en; });
+    var tieneManc = (def.props || []).some(function (p) { return p.tipo === 'mancuernas'; });
+    if (tieneBarra && /mancuerna/.test(nn)) cambio = 'mancuernas';
+    if (tieneManc && /\bbarra\b/.test(nn)) cambio = 'barra';
+    if (!cambio) return def;
+    var copia = {};
+    for (var k in def) copia[k] = def[k];
+    copia.props = def.props.map(function (p) {
+      if (cambio === 'mancuernas' && p.tipo === 'barra' && !p.en) return { tipo: 'mancuernas' };
+      if (cambio === 'barra' && p.tipo === 'mancuernas') return { tipo: 'barra' };
+      return p;
+    });
+    copia._F = null;
+    return copia;
+  }
+
+  /* ---------- reproducción ---------- */
+  var vivos = [], corriendo = false, visibles = new WeakMap();
+  var io = typeof IntersectionObserver !== 'undefined' ? new IntersectionObserver(function (es) {
+    es.forEach(function (e) { visibles.set(e.target, e.isIntersecting); });
+  }) : null;
+
+  function montar(el, nombre, clave) {
+    var def = buscar(nombre, clave);
+    if (!def) { el.innerHTML = ''; el.style.display = 'none'; return null; }
+    el.style.display = '';
+    el.classList.add('anim');
+    el._anim = { def: def, ini: performance.now() - Math.random() * 400, ult: -1 };
+    el.innerHTML = svg(def, 0);
+    if (vivos.indexOf(el) < 0) vivos.push(el);
+    if (io) io.observe(el);
+    if (!corriendo) { corriendo = true; requestAnimationFrame(tick); }
+    return def;
+  }
+
+  function tick(ahora) {
+    vivos = vivos.filter(function (el) { return el.isConnected && el._anim; });
+    vivos.forEach(function (el) {
+      if (io && visibles.get(el) === false) return;
+      var a = el._anim;
+      if (ahora - a.ult < 33) return;              // ~30 cuadros por segundo
+      a.ult = ahora;
+      var dur = a.def.dur || 2600;
+      el.innerHTML = svg(a.def, ((ahora - a.ini) % dur) / dur);
+    });
+    if (vivos.length) requestAnimationFrame(tick); else corriendo = false;
+  }
+
+  return {
+    montar: montar, buscar: buscar, svg: svg,
+    lista: function () { return (window.ANIM_CATALOGO || []).map(function (x) { return { id: x.id, nombre: x.nombre }; }); }
+  };
+})();
+</script>

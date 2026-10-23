@@ -1,0 +1,264 @@
+<script>
+/* =====================================================================
+ *  CATÁLOGO DE ANIMACIONES
+ *  claves: palabras (sin tildes, minúsculas) que se buscan en el nombre
+ *  del ejercicio. El orden importa: primero lo específico, luego lo general.
+ *  pie / mano: posición objetivo [x, y] relativa a cadera / hombro.
+ * ===================================================================== */
+var DE_PIE = [1, 39.5];
+window.ANIM_CATALOGO = [
+  { id: 'cuerda', nombre: 'Saltos de cuerda', claves: ['cuerda', 'comba'], dur: 700,
+    props: [{ tipo: 'cuerda', vueltas: 1 }],
+    f: [{ pie: DE_PIE, f: 35, sube: 7, ua1: 18, fa1: 70, ua2: 10, fa2: 50 }, { pie: DE_PIE, ua1: 18, fa1: 70, ua2: 10, fa2: 50 }],
+    tip: 'Salte bajito sobre la punta de los pies y gire la cuerda con las muñecas, codos cerca del cuerpo.' },
+
+  { id: 'jumping', nombre: 'Jumping jacks', claves: ['jumping', 'tijera'], vista: 'frente', dur: 1100,
+    f: [{ ua: 6, fa: 6, th: 3, sh: 3 }, { ua: 165, fa: 172, th: 20, sh: 14, sube: 4 }],
+    tip: 'Abra piernas y brazos al mismo tiempo, aterrice suave y mantenga el ritmo.' },
+
+  { id: 'burpee', nombre: 'Burpees', claves: ['burpee'], modo: 'ciclo', dur: 3200, x: 70,
+    f: [
+      { pie: DE_PIE },
+      { t: 120, pie: [14, 18], mano: [12, 30] },
+      { t: 103, pie: [-38, 8], mano: [1, 24], c: -10 },
+      { t: 120, pie: [14, 18], mano: [12, 30] },
+      { pie: DE_PIE, f: 35, sube: 9, ua: 170, fa: 175 }
+    ],
+    tip: 'Agáchese, lleve los pies atrás a plancha, regrese y salte con los brazos arriba. Abdomen firme en la plancha.' },
+
+  { id: 'escalador', nombre: 'Mountain climbers', claves: ['mountain', 'escalador'], dur: 900, ancla: 'cuerpo', x: 66,
+    f: [{ t: 103, c: -10, pie1: [6, 14], pie2: [-38, 9], mano: [1, 25] }, { t: 103, c: -10, pie1: [-38, 9], pie2: [6, 14], mano: [1, 25] }],
+    tip: 'En plancha alta, lleve las rodillas al pecho alternando rápido. Cadera baja y estable.' },
+
+  { id: 'bici-abdominal', nombre: 'Bicicleta abdominal', claves: ['bicicleta abdominal', 'abdominal bicicleta'], dur: 1600, x: 108,
+    props: [{ tipo: 'colchoneta', x: 30, w: 110 }],
+    f: [{ t: -112, pie1: [8, -14], pie2: [38, -8], mano: [-6, -9], cod: 1 }, { t: -112, pie1: [38, -8], pie2: [8, -14], mano: [-6, -9], cod: 1 }],
+    tip: 'Hombros despegados del piso, lleve el codo hacia la rodilla contraria mientras estira la otra pierna.' },
+
+  { id: 'bicicleta', nombre: 'Bicicleta estática', claves: ['bicicleta', 'spinning', 'ciclismo'], modo: 'ciclo', dur: 1400, ancla: 'cadera', x: 62, y: 62,
+    props: [{ tipo: 'linea', x1: 56, y1: 66, x2: 82, y2: 100, w: 4, atras: true }, { tipo: 'linea', x1: 50, y1: 65, x2: 66, y2: 65, w: 4, atras: true },
+      { tipo: 'linea', x1: 82, y1: 100, x2: 104, y2: 58, w: 4, atras: true }, { tipo: 'linea', x1: 98, y1: 58, x2: 110, y2: 56, w: 4, atras: true },
+      { tipo: 'linea', x1: 60, y1: 108, x2: 112, y2: 108, w: 4, atras: true }, { tipo: 'rueda', x: 82, y: 92, r: 9, atras: true }],
+    f: [
+      { t: 150, pie1: [20, 22], pie2: [20, 38], mano: [26, 6] },
+      { t: 150, pie1: [28, 30], pie2: [12, 30], mano: [26, 6] },
+      { t: 150, pie1: [20, 38], pie2: [20, 22], mano: [26, 6] },
+      { t: 150, pie1: [12, 30], pie2: [28, 30], mano: [26, 6] }
+    ],
+    tip: 'Ajuste el sillín a la altura de la cadera. Espalda recta y pedaleo constante.' },
+
+  { id: 'trote', nombre: 'Trotar / caminadora', claves: ['trote', 'trotar', 'correr', 'caminadora', 'carrera', 'caminar'], dur: 900,
+    f: [{ t: 172, pie1: [12, 36], pie2: [-14, 30], rod2: 1, ua1: -30, fa1: 60, ua2: 35, fa2: 120 },
+        { t: 172, pie1: [-14, 30], pie2: [12, 36], ua1: 35, fa1: 120, ua2: -30, fa2: 60, sube: 3 }],
+    tip: 'Pasos cortos, apoye bajo la cadera y mueva los brazos en sentido contrario a las piernas.' },
+
+  { id: 'bulgara', nombre: 'Sentadilla búlgara', claves: ['bulgara', 'split squat'], x: 102,
+    props: [{ tipo: 'banco', x: 22, y: 84, w: 36 }, { tipo: 'mancuernas' }],
+    f: [{ pie1: [14, 36], pie2: [-30, 8], f2: -100 }, { pie1: [16, 22], pie2: [-30, -6], f2: -100 }],
+    tip: 'Pie de atrás sobre el banco. Baje recto hasta que el muslo de adelante quede paralelo al piso.' },
+
+  { id: 'sentadilla-salto', nombre: 'Sentadilla con salto', claves: ['sentadilla con salto', 'jump squat', 'squat jump'], dur: 1500,
+    f: [{ t: 140, pie: [15, 22], ua: -40, fa: -25 }, { pie: DE_PIE, f: 30, sube: 10, ua: 170, fa: 175 }],
+    tip: 'Baje en sentadilla y salte con fuerza. Aterrice suave con las rodillas un poco dobladas.' },
+
+  { id: 'goblet', nombre: 'Sentadilla goblet', claves: ['goblet', 'copa'], brazosRel: true,
+    props: [{ tipo: 'mancuerna' }],
+    f: [{ pie: DE_PIE, ua: 22, fa: 168 }, { t: 152, pie: [15, 21], ua: 22, fa: 168 }],
+    tip: 'Pesa pegada al pecho, codos entre las rodillas y pecho erguido al bajar.' },
+
+  { id: 'sentadilla-barra', nombre: 'Sentadilla con barra', claves: ['sentadilla con barra', 'sentadilla trasera', 'back squat', 'sentadilla libre'], brazosRel: true,
+    props: [{ tipo: 'barra', en: 'espalda', atras: true }],
+    f: [{ pie: DE_PIE, ua: -50, fa: 160 }, { t: 142, pie: [16, 21], ua: -50, fa: 160 }],
+    tip: 'Barra sobre los trapecios, pies al ancho de hombros. Baje con la espalda neutra hasta el paralelo.' },
+
+  { id: 'sentadilla', nombre: 'Sentadilla', claves: ['sentadilla', 'squat'],
+    f: [{ pie: DE_PIE, ua: 90, fa: 90 }, { t: 145, pie: [15, 21], ua: 85, fa: 85 }],
+    tip: 'Siéntese hacia atrás como en una silla, talones apoyados y rodillas en dirección de los pies.' },
+
+  { id: 'prensa', nombre: 'Prensa de piernas', claves: ['prensa', 'leg press', 'press de pierna'], ancla: 'cadera', x: 56, y: 92,
+    props: [{ tipo: 'linea', x1: 40, y1: 98, x2: 66, y2: 98, w: 5, atras: true }, { tipo: 'linea', x1: 42, y1: 98, x2: 26, y2: 70, w: 5, atras: true },
+      { tipo: 'linea', x1: 52, y1: 100, x2: 52, y2: 110, w: 4, atras: true }, { tipo: 'linea', x1: 86, y1: 70, x2: 138, y2: 18, w: 3, atras: true },
+      { tipo: 'plataforma', ang: 45 }],
+    f: [{ t: -150, pie: [14, -16], mano: [8, 18] }, { t: -150, pie: [27, -29], mano: [8, 18] }],
+    tip: 'Espalda pegada al respaldo. Empuje con todo el pie sin bloquear las rodillas al estirar.' },
+
+  { id: 'zancada', nombre: 'Zancadas', claves: ['zancada', 'estocada', 'lunge', 'desplante'], x: 100,
+    props: [{ tipo: 'mancuernas' }],
+    f: [{ pie1: [18, 35], pie2: [-20, 35] }, { pie1: [18, 21], pie2: [-20, 21] }],
+    tip: 'Paso largo, baje hasta que ambas rodillas formen 90°. Torso recto y rodilla de adelante sobre el tobillo.' },
+
+  { id: 'step', nombre: 'Step up al cajón', claves: ['step', 'cajon', 'subida al banco'], ancla: 'pieFijo', x: 104, y: 91,
+    props: [{ tipo: 'caja', x: 88, y: 94, w: 44, h: 16, atras: true }],
+    f: [{ pie1: [16, 20], pie2: [-4, 35.5] }, { pie1: [1, 39], pie2: [6, 30] }],
+    tip: 'Apoye todo el pie en el cajón y suba empujando con esa pierna, sin impulsarse con la de abajo.' },
+
+  { id: 'rumano', nombre: 'Peso muerto rumano', claves: ['rumano', 'buenos dias', 'piernas rigidas'], x: 92,
+    props: [{ tipo: 'barra' }],
+    f: [{ pie: DE_PIE }, { t: 98, pie: [13, 37] }],
+    tip: 'Rodillas apenas flexionadas: lleve la cadera hacia atrás con la espalda recta y la barra pegada a las piernas.' },
+
+  { id: 'peso-muerto', nombre: 'Peso muerto', claves: ['peso muerto', 'deadlift'], x: 92,
+    props: [{ tipo: 'barra' }],
+    f: [{ t: 126, pie: [15, 26], c: -15 }, { pie: DE_PIE }],
+    tip: 'Barra pegada a las espinillas, espalda neutra. Empuje el piso con las piernas y extienda la cadera al final.' },
+
+  { id: 'hip-thrust', nombre: 'Hip thrust', claves: ['hip thrust', 'empuje de cadera'], x: 120,
+    props: [{ tipo: 'banco', x: 18, y: 95, w: 50 }, { tipo: 'barra', en: 'cadera' }],
+    f: [{ t: -112, pie: [20, 8], ua: -80, fa: -90 }, { t: -90, pie: [20, 20], ua: -80, fa: -90 }],
+    tip: 'Parte alta de la espalda en el banco. Suba la cadera apretando glúteos hasta formar una línea recta.' },
+
+  { id: 'puente', nombre: 'Puente de glúteos', claves: ['puente'], x: 112,
+    props: [{ tipo: 'colchoneta', x: 30, w: 110 }],
+    f: [{ t: -90, pie: [20, 3], mano: [26, 3] }, { t: -64, pie: [20, 16], mano: [26, -10] }],
+    tip: 'Talones cerca de los glúteos. Eleve la cadera, sostenga un segundo arriba y baje controlado.' },
+
+  { id: 'kettlebell', nombre: 'Kettlebell swing', claves: ['kettlebell', 'swing', 'pesa rusa'], dur: 1800, x: 88,
+    props: [{ tipo: 'kettlebell' }],
+    f: [{ t: 108, pie: [12, 36], ua: -18, fa: -28 }, { pie: DE_PIE, ua: 90, fa: 92 }],
+    tip: 'El impulso sale de la cadera, no de los brazos. Espalda recta y glúteos firmes arriba.' },
+
+  { id: 'cuadriceps', nombre: 'Extensión de cuádriceps', claves: ['extension de cuadriceps', 'extension de pierna', 'cuadriceps'], ancla: 'cadera', x: 64, y: 80,
+    props: [{ tipo: 'banco', x: 46, y: 84, w: 34 }, { tipo: 'linea', x1: 49, y1: 84, x2: 43, y2: 48, w: 5, atras: true }, { tipo: 'rodillo', en: 'a1', dx: 2, dy: -1 }],
+    f: [{ t: 188, th: 90, sh: 2, mano: [5, 27] }, { t: 188, th: 90, sh: 82, mano: [5, 27] }],
+    tip: 'Estire la rodilla por completo, sostenga un segundo y baje lento sin dejar caer el peso.' },
+
+  { id: 'femoral-sentado', nombre: 'Curl femoral sentado', claves: ['femoral sentado', 'curl femoral sentado'], ancla: 'cadera', x: 64, y: 80,
+    props: [{ tipo: 'banco', x: 46, y: 84, w: 34 }, { tipo: 'linea', x1: 49, y1: 84, x2: 43, y2: 48, w: 5, atras: true }, { tipo: 'rodillo', en: 'a1', dx: 0, dy: 4 }],
+    f: [{ t: 190, th: 90, sh: 80, mano: [5, 27] }, { t: 190, th: 90, sh: -12, mano: [5, 27] }],
+    tip: 'Lleve los talones hacia abajo y atrás, controle la subida y no despegue la cadera del asiento.' },
+
+  { id: 'femoral', nombre: 'Curl femoral acostado', claves: ['curl femoral', 'femoral', 'isquio'], ancla: 'cadera', x: 74, y: 86,
+    props: [{ tipo: 'banco', x: 28, y: 90, w: 96 }, { tipo: 'rodillo', en: 'a1', dx: 0, dy: -4 }],
+    f: [{ t: 90, c: 20, th: -92, sh: -92, mano: [12, 10] }, { t: 90, c: 20, th: -92, sh: -170, mano: [12, 10] }],
+    tip: 'Cadera pegada al banco. Doble las rodillas llevando los talones a los glúteos y baje despacio.' },
+
+  { id: 'talones', nombre: 'Elevación de talones', claves: ['talon', 'pantorrilla', 'gemelo'], dur: 1600,
+    props: [{ tipo: 'mancuernas' }],
+    f: [{ pie: DE_PIE, f: 92 }, { pie: DE_PIE, f: 22 }],
+    tip: 'Suba en punta de pies lo más alto posible, pause y baje lento.' },
+
+  { id: 'press-inclinado', nombre: 'Press inclinado', claves: ['inclinado'], ancla: 'cadera', x: 92, y: 86,
+    props: [{ tipo: 'linea', x1: 96, y1: 92, x2: 66, y2: 60, w: 6, atras: true }, { tipo: 'banco', x: 82, y: 92, w: 28 }, { tipo: 'barra' }],
+    f: [{ t: -135, pie: [18, 22], mano: [3, -8] }, { t: -135, pie: [18, 22], mano: [1, -31] }],
+    tip: 'Banco a 30-45°. Baje la barra a la parte alta del pecho y empuje hacia arriba sin despegar la espalda.' },
+
+  { id: 'press-banca', nombre: 'Press de banca', claves: ['press banca', 'press de banca', 'banca', 'bench', 'press plano'], ancla: 'cadera', x: 96, y: 82,
+    props: [{ tipo: 'banco', x: 38, y: 87, w: 66 }, { tipo: 'barra' }],
+    f: [{ t: -90, pie: [18, 24], mano: [3, -8] }, { t: -90, pie: [18, 24], mano: [0, -31] }],
+    tip: 'Omóplatos juntos y pies firmes. Baje la barra al pecho controlado y empuje en línea recta.' },
+
+  { id: 'press-pecho', nombre: 'Press de pecho en máquina', claves: ['press de pecho', 'chest press', 'pecho en maquina'], ancla: 'cadera', x: 58, y: 82,
+    props: [{ tipo: 'banco', x: 40, y: 86, w: 32 }, { tipo: 'linea', x1: 43, y1: 86, x2: 43, y2: 46, w: 5, atras: true }],
+    f: [{ pie: [20, 22], mano: [6, 3] }, { pie: [20, 22], mano: [31, 2] }],
+    tip: 'Espalda contra el respaldo, empuje al frente sin bloquear codos y regrese despacio.' },
+
+  { id: 'aperturas', nombre: 'Aperturas', claves: ['apertura', 'pec deck', 'peck deck', 'cristo', 'fly'], ancla: 'cadera', x: 62, y: 82,
+    props: [{ tipo: 'banco', x: 44, y: 86, w: 32 }, { tipo: 'linea', x1: 47, y1: 86, x2: 47, y2: 44, w: 5, atras: true }],
+    f: [{ pie: [20, 22], ua: -80, fa: -55 }, { pie: [20, 22], ua: 82, fa: 98 }],
+    tip: 'Codos ligeramente doblados. Cierre los brazos al frente apretando el pecho y abra controlado.' },
+
+  { id: 'flexiones', nombre: 'Flexiones de pecho', claves: ['flexion', 'lagartija', 'push up', 'pushup'], x: 38,
+    f: [{ t: 105, c: -12, pie: [-38, 10], mano: [1, 24.5] }, { t: 96, c: -6, pie: [-39, 4], mano: [0.3, 10.6] }],
+    tip: 'Cuerpo en línea recta de cabeza a talones. Baje el pecho cerca del piso con los codos a 45°.' },
+
+  { id: 'fondos', nombre: 'Fondos en paralelas', claves: ['fondo', 'dips', 'paralelas'], ancla: 'mano', x: 84, y: 54,
+    props: [{ tipo: 'paralelas', x1: 62, x2: 108, y: 56, atras: true }],
+    f: [{ t: 176, ua: 2, fa: 2, th: 8, sh: -60 }, { t: 160, ua: -68, fa: 6, th: 20, sh: -50 }],
+    tip: 'Baje hasta que los codos formen 90°, torso un poco inclinado al frente, y empuje hasta estirar.' },
+
+  { id: 'press-frances', nombre: 'Press francés', claves: ['frances', 'rompecraneo', 'skull'], ancla: 'cadera', x: 96, y: 82,
+    props: [{ tipo: 'banco', x: 38, y: 87, w: 66 }, { tipo: 'barra' }],
+    f: [{ t: -90, pie: [18, 24], ua: 172, fa: 178 }, { t: -90, pie: [18, 24], ua: 172, fa: 265 }],
+    tip: 'Codos fijos apuntando al techo. Baje la barra hacia la frente doblando solo los codos.' },
+
+  { id: 'triceps-nuca', nombre: 'Extensión de tríceps tras nuca', claves: ['tras nuca', 'triceps con mancuerna', 'triceps sobre la cabeza', 'triceps overhead'],
+    props: [{ tipo: 'mancuerna' }],
+    f: [{ pie: DE_PIE, ua: 172, fa: 178 }, { pie: DE_PIE, ua: 172, fa: 330 }],
+    tip: 'Codos apuntando arriba y cerca de la cabeza. Mueva solo el antebrazo.' },
+
+  { id: 'triceps-polea', nombre: 'Extensión de tríceps en polea', claves: ['triceps', 'pushdown', 'push down'], x: 74,
+    props: [{ tipo: 'polea', x: 120, y: 14, poste: true, px: 128 }],
+    f: [{ t: 172, pie: DE_PIE, ua: 6, fa: 150 }, { t: 172, pie: DE_PIE, ua: 2, fa: 8 }],
+    tip: 'Codos pegados al cuerpo y quietos. Empuje hacia abajo hasta estirar y suba lento.' },
+
+  { id: 'press-hombro', nombre: 'Press de hombro con mancuernas', claves: ['press de hombro', 'press arnold', 'hombro con mancuerna'], ancla: 'cadera', x: 66, y: 82,
+    props: [{ tipo: 'banco', x: 48, y: 86, w: 32 }, { tipo: 'linea', x1: 51, y1: 86, x2: 51, y2: 44, w: 5, atras: true }, { tipo: 'mancuernas' }],
+    f: [{ pie: [20, 22], ua: 62, fa: 180 }, { pie: [20, 22], ua: 172, fa: 178 }],
+    tip: 'Espalda apoyada. Empuje las mancuernas hacia arriba sin arquear la zona lumbar.' },
+
+  { id: 'press-militar', nombre: 'Press militar', claves: ['press militar', 'press de hombros', 'overhead press', 'press sobre la cabeza'],
+    props: [{ tipo: 'barra' }],
+    f: [{ pie: DE_PIE, mano: [5, -3] }, { pie: DE_PIE, mano: [0, -31] }],
+    tip: 'Abdomen y glúteos firmes. Empuje la barra por encima de la cabeza en línea recta.' },
+
+  { id: 'laterales', nombre: 'Elevaciones laterales', claves: ['elevacion lateral', 'elevaciones laterales', 'vuelo lateral', 'vuelos laterales', 'laterales'], vista: 'frente',
+    props: [{ tipo: 'mancuernas' }],
+    f: [{ ua: 10, fa: 14 }, { ua: 86, fa: 94 }],
+    tip: 'Suba los brazos hasta la altura de los hombros con los codos un poco doblados. Sin balanceo.' },
+
+  { id: 'face-pull', nombre: 'Face pull', claves: ['face pull', 'jalon a la cara'], x: 70,
+    props: [{ tipo: 'polea', x: 124, y: 30, poste: true, px: 130 }],
+    f: [{ t: 184, pie: [-2, 39.5], mano: [30, 2] }, { t: 186, pie: [-2, 39.5], mano: [8, -11], cod: 1 }],
+    tip: 'Jale la cuerda hacia la cara separando las manos, codos altos y omóplatos juntos.' },
+
+  { id: 'jalon', nombre: 'Jalón al pecho', claves: ['jalon', 'pulldown', 'pull down', 'polea al pecho'], ancla: 'cadera', x: 66, y: 86,
+    props: [{ tipo: 'banco', x: 46, y: 90, w: 36 }, { tipo: 'linea', x1: 72, y1: 72, x2: 92, y2: 72, w: 4, atras: true }, { tipo: 'polea', x: 76, y: 6, barraMano: true }],
+    f: [{ t: 186, pie: [20, 18], mano: [5, -30] }, { t: 192, pie: [20, 18], mano: [9, 2] }],
+    tip: 'Lleve la barra a la parte alta del pecho bajando los codos. Pecho afuera y sin balancearse.' },
+
+  { id: 'dominadas', nombre: 'Dominadas', claves: ['dominada', 'pull up', 'chin up'], ancla: 'mano', x: 84, y: 14,
+    props: [{ tipo: 'barraFija', x1: 50, x2: 118, y: 14, atras: true }],
+    f: [{ ua: 180, fa: 180, th: -4, sh: -70 }, { ua: 24, fa: 176, th: -4, sh: -70 }],
+    tip: 'Cuelgue con brazos estirados y suba hasta pasar la barbilla de la barra. Baje completo y controlado.' },
+
+  { id: 'remo-polea', nombre: 'Remo sentado en polea', claves: ['remo sentado', 'remo en polea', 'remo bajo', 'polea baja'], ancla: 'cadera', x: 52, y: 96,
+    props: [{ tipo: 'banco', x: 30, y: 100, w: 70, sinPatas: true }, { tipo: 'linea', x1: 92, y1: 82, x2: 92, y2: 100, w: 4, atras: true }, { tipo: 'polea', x: 138, y: 90, poste: true, px: 142 }],
+    f: [{ t: 160, pie: [36, 6], mano: [30, 8] }, { t: 184, pie: [36, 6], mano: [6, 16] }],
+    tip: 'Pecho afuera, jale hacia el abdomen llevando los codos atrás y junte los omóplatos.' },
+
+  { id: 'remo-banda', nombre: 'Remo con banda', claves: ['banda', 'liga'], x: 74,
+    props: [{ tipo: 'banda', x: 140, y: 62 }],
+    f: [{ t: 178, pie: [-2, 39.5], mano: [30, 4] }, { t: 182, pie: [-2, 39.5], mano: [4, 13] }],
+    tip: 'Rodillas suaves, jale la banda hacia el abdomen con los codos pegados al cuerpo.' },
+
+  { id: 'remo-mancuerna', nombre: 'Remo con mancuerna', claves: ['remo con mancuerna', 'remo a una mano', 'serrucho'], x: 54,
+    props: [{ tipo: 'banco', x: 82, y: 82, w: 50 }, { tipo: 'mancuerna' }],
+    f: [{ t: 98, pie1: [10, 37], pie2: [-12, 37], mano1: [0, 29], mano2: [2, 28] }, { t: 98, pie1: [10, 37], pie2: [-12, 37], mano1: [-10, 8], mano2: [2, 28] }],
+    tip: 'Apoye una mano en el banco, espalda plana. Lleve la mancuerna hacia la cadera con el codo pegado.' },
+
+  { id: 'remo-menton', nombre: 'Remo al mentón', claves: ['menton', 'remo alto', 'upright row'],
+    props: [{ tipo: 'barra' }],
+    f: [{ pie: DE_PIE, ua: 2, fa: 2 }, { pie: DE_PIE, mano: [8, 4], cod: 1 }],
+    tip: 'Barra cerca del cuerpo, suba guiando con los codos hasta la altura de los hombros.' },
+
+  { id: 'remo', nombre: 'Remo con barra', claves: ['remo'], x: 92,
+    props: [{ tipo: 'barra' }],
+    f: [{ t: 112, pie: [12, 36], ua: 0, fa: 0 }, { t: 112, pie: [12, 36], mano: [-6, 14] }],
+    tip: 'Torso inclinado y espalda recta. Lleve la barra al abdomen juntando los omóplatos.' },
+
+  { id: 'curl', nombre: 'Curl de bíceps', claves: ['curl', 'biceps', 'martillo'], dur: 2200,
+    props: [{ tipo: 'mancuernas' }],
+    f: [{ pie: DE_PIE, ua: 4, fa: 6 }, { pie: DE_PIE, ua: 10, fa: 158 }],
+    tip: 'Codos quietos a los lados del cuerpo. Suba sin balancearse y baje despacio.' },
+
+  { id: 'plancha', nombre: 'Plancha', claves: ['plancha', 'plank'], dur: 3000, x: 38,
+    props: [{ tipo: 'colchoneta', x: 26, w: 110 }],
+    f: [{ t: 99, c: -12, pie: [-38, 6], ua: 0, fa: 90 }, { t: 100.5, c: -12, pie: [-38, 7], ua: 0, fa: 90 }],
+    tip: 'Codos bajo los hombros, cuerpo recto y abdomen apretado. No deje caer la cadera. ¡Mantenga!' },
+
+  { id: 'abs-polea', nombre: 'Abdominales en polea', claves: ['abdominales en polea', 'crunch en polea', 'abdominal en polea'], x: 52, brazosRel: true,
+    props: [{ tipo: 'polea', x: 120, y: 8, poste: true, px: 128 }],
+    f: [{ t: 170, pie: [-20, 20], f: -100, ua: 165, fa: -15 }, { t: 122, pie: [-20, 20], f: -100, ua: 165, fa: -15 }],
+    tip: 'De rodillas, cuerda junto a la cabeza. Enrolle el tronco hacia abajo contrayendo el abdomen.' },
+
+  { id: 'elev-piernas', nombre: 'Elevación de piernas', claves: ['elevacion de piernas', 'elevaciones de piernas', 'leg raise'], x: 120,
+    props: [{ tipo: 'colchoneta', x: 30, w: 110 }],
+    f: [{ t: -90, pie: [39, -2], ua: -80, fa: 90 }, { t: -90, pie: [3, -39], ua: -80, fa: 90 }],
+    tip: 'Zona lumbar pegada al piso. Suba las piernas juntas y baje lento sin tocar el suelo.' },
+
+  { id: 'crunch', nombre: 'Crunch abdominal', claves: ['crunch', 'abdominal'], x: 112,
+    props: [{ tipo: 'colchoneta', x: 30, w: 110 }],
+    f: [{ t: -90, pie: [24, 3], mano: [-8, -6], cod: 1 }, { t: -118, pie: [24, 3], mano: [-6, -9], cod: 1 }],
+    tip: 'Rodillas dobladas. Despegue los hombros del piso contrayendo el abdomen, sin jalar el cuello.' }
+];
+</script>
