@@ -3,19 +3,32 @@
 <head>
   <base target="_top">
   <meta charset="utf-8">
-  <meta name="theme-color" content="#0b0b0b">
+  <meta name="theme-color" content="#1A1E23">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    :root { --am:#FFC000; --fondo:#0b0b0b; --card:#161616; --card2:#1f1f1f; --borde:#2b2b2b; --txt:#f2f2f2; --sub:#a3a3a3; --ok:#22c55e; --mal:#ef4444; --med:#facc15; }
+    /* Paleta "sala de pesas" en modo oscuro: grafito, hierro y el oro de King Gym */
+    :root { --am:#F47A20; --fondo:#091C3E; --card:#10284F; --card2:#17335F; --borde:#24406B; --txt:#EEF2F8; --sub:#A3B3CD; --ok:#3CCB7F; --mal:#F57A6E; --med:#F6B65A;
+            --titulo:'Inter', 'Segoe UI', Arial, sans-serif; }
     * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-    html, body { margin:0; background:var(--fondo); color:var(--txt); font-family:'Segoe UI', Roboto, Arial, sans-serif; font-size:15px; }
+    html, body { margin:0; background:var(--fondo); color:var(--txt); font-family:'Inter', 'Segoe UI', Roboto, Arial, sans-serif; font-size:16px; line-height:1.4; }
     .hidden { display:none !important; }
-    h2 { font-size:19px; margin:0 0 10px; } h3 { font-size:16px; margin:0 0 10px; }
+    h2, h3 { font-family:var(--titulo); }
+    h2 { font-size:24px; margin:0 0 10px; font-weight:700; } h3 { font-size:19px; margin:0 0 10px; font-weight:700; }
+    :focus-visible { outline:3px solid var(--am); outline-offset:2px; }
+    .campo-clave { position:relative; }
+    .campo-clave input { padding-right:46px; }
+    .ver-clave { position:absolute; right:6px; bottom:7px; border:0; background:transparent; cursor:pointer; font-size:19px; padding:4px 6px; color:var(--sub); }
+    .reglas-clave { margin:0; padding-left:18px; color:var(--sub); font-size:14px; }
+    .medidor { height:6px; border-radius:6px; background:var(--card2); overflow:hidden; }
+    .medidor i { display:block; height:100%; width:0; transition:width .2s; }
     small, .sub { color:var(--sub); }
-    input, select, textarea { width:100%; padding:12px; border-radius:10px; border:1px solid var(--borde); background:#0f0f0f; color:var(--txt); font-size:16px; font-family:inherit; }
+    input, select, textarea { width:100%; padding:12px; border-radius:10px; border:1px solid var(--borde); background:#0B2048; color:var(--txt); font-size:16px; font-family:inherit; }
     input:focus, select:focus { outline:2px solid var(--am); border-color:transparent; }
-    label { display:flex; flex-direction:column; gap:5px; font-size:13px; color:var(--sub); font-weight:600; }
-    .btn { border:0; border-radius:12px; padding:13px 16px; font-weight:800; font-size:15px; cursor:pointer; font-family:inherit; }
-    .btn-am { background:var(--am); color:#000; }
+    label { display:flex; flex-direction:column; gap:5px; font-size:14px; color:var(--sub); font-weight:600; }
+    .btn { border:0; border-radius:12px; padding:13px 16px; font-weight:700; font-size:16px; cursor:pointer; font-family:inherit; }
+    .btn-am { background:var(--am); color:#fff; }
     .btn-os { background:var(--card2); color:var(--txt); border:1px solid var(--borde); }
     .btn-sm { padding:8px 12px; font-size:13px; border-radius:9px; }
     .w100 { width:100%; }
@@ -24,16 +37,16 @@
     /* Login */
     .login { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
     .login-box { width:100%; max-width:360px; display:flex; flex-direction:column; gap:14px; }
-    .marca { background:var(--am); color:#000; font-weight:900; font-size:30px; letter-spacing:2px; text-align:center; padding:14px; border-radius:14px; }
+    .marca { font-family:var(--titulo); color:var(--txt); font-weight:800; font-size:40px; letter-spacing:1px; line-height:1; padding:0 0 14px; border-bottom:4px solid var(--am); margin-bottom:6px; }
     .recordar { flex-direction:row; align-items:center; gap:8px; font-weight:600; }
     .recordar input { width:20px; height:20px; accent-color:var(--am); }
-    .marca small { display:block; color:#000; font-size:13px; letter-spacing:1px; font-weight:700; }
+    .marca small { display:block; font-family:'Inter', sans-serif; color:var(--sub); font-size:16px; letter-spacing:0; font-weight:500; margin-top:8px; }
 
     /* App */
-    header { position:sticky; top:0; z-index:10; background:rgba(11,11,11,.94); backdrop-filter:blur(6px); padding:12px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--borde); }
-    header b { color:var(--am); letter-spacing:1px; }
+    header { position:sticky; top:0; z-index:10; background:rgba(9,28,62,.94); backdrop-filter:blur(6px); padding:12px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--borde); }
+    header b { font-family:var(--titulo); font-size:20px; color:var(--txt); letter-spacing:.5px; border-bottom:3px solid var(--am); }
     main { padding:14px 16px 170px; max-width:720px; margin:0 auto; }
-    nav.abajo { position:fixed; bottom:0; left:0; right:0; z-index:10; display:grid; grid-template-columns:repeat(4,1fr); background:#111; border-top:1px solid var(--borde); padding-bottom:env(safe-area-inset-bottom); }
+    nav.abajo { position:fixed; bottom:0; left:0; right:0; z-index:10; display:grid; grid-template-columns:repeat(4,1fr); background:#20252C; border-top:1px solid var(--borde); padding-bottom:env(safe-area-inset-bottom); }
     nav.abajo button { background:none; border:0; color:var(--sub); padding:10px 4px 12px; font-size:12px; font-weight:700; display:flex; flex-direction:column; align-items:center; gap:3px; cursor:pointer; font-family:inherit; }
     nav.abajo button span { font-size:21px; }
     nav.abajo button.activo { color:var(--am); }
@@ -97,6 +110,18 @@
     .toast { position:fixed; top:14px; left:50%; transform:translate(-50%, -140%); background:#222; color:#fff; padding:12px 16px; border-radius:12px; z-index:200; transition:transform .25s; font-weight:700; max-width:92vw; text-align:center; border:1px solid var(--borde); }
     .toast.show { transform:translate(-50%, 0); }
     .toast.ok { background:#14532d; border-color:#166534; } .toast.err { background:#7f1d1d; border-color:#991b1b; }
+      .btn-salto { display:block; text-align:center; text-decoration:none; background:var(--am); color:#fff; }
+    .modal-box.pol { max-width:560px; max-height:92vh; overflow:auto; }
+    .modal-box.pol > * { flex-shrink:0; }
+    .pol-txt { white-space:pre-wrap; font-size:14px; line-height:1.55; max-height:38vh; overflow:auto; background:#0B2048; border:1px solid var(--borde); border-radius:12px; padding:12px; color:var(--txt); }
+    .acepto { display:flex; flex-direction:row; align-items:flex-start; gap:10px; font-weight:500; color:var(--txt); font-size:14.5px; line-height:1.4; cursor:pointer; }
+    .acepto span { flex:1; min-width:0; }
+    .acepto input { width:20px; height:20px; flex:0 0 20px; padding:0; accent-color:var(--am); margin-top:1px; }
+    .firma-caja { border:1px solid var(--borde); border-radius:12px; overflow:hidden; background:#fff; }
+    .firma { display:block; width:100%; height:150px; touch-action:none; background:#fff; }
+    .firma-pie { display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:#EEF2F8; color:#4A5A70; font-size:13px; }
+    .enlace { background:none; border:0; padding:4px; color:var(--am); font:inherit; font-weight:700; cursor:pointer; }
+    .firma-pie .enlace { color:#C2541F; }
   </style>
   <?!= include('Api'); ?>
   <?!= include('Grafica'); ?>
@@ -106,16 +131,17 @@
 <body class="tema-oscuro">
   <div id="loader" class="loader hidden"><div class="spin"></div></div>
   <div id="toast" class="toast"></div>
+  <div id="datosPagina" hidden data-url="<?= urlApp ?>" data-pase="<?= pase ?>"></div>
 
   <!-- LOGIN -->
   <section id="vLogin" class="login">
     <div class="login-box">
-      <div class="marca"><span id="lgGym">MI GIMNASIO</span><small>APP DE SOCIOS</small></div>
-      <label>Cédula<input id="lgCed" inputmode="numeric" autocomplete="username"></label>
-      <label>PIN<input id="lgPin" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password"></label>
+      <div class="marca"><span id="lgGym">MI GIMNASIO</span><small>Tus rutinas y tu progreso</small></div>
+      <label for="lgCed">Cédula o usuario<input id="lgCed" name="username" required maxlength="80" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Su cédula o usuario"></label>
+      <label for="lgPin" class="campo-clave">Contraseña<input id="lgPin" name="password" type="password" required maxlength="64" autocomplete="current-password" inputmode="text" autocapitalize="none" autocorrect="off" spellcheck="false"><button type="button" class="ver-clave" aria-label="Mostrar contraseña" onclick="GymAPI.verClave(this)">👁</button></label>
       <button class="btn btn-am w100" onclick="entrar()">Entrar</button>
       <label class="recordar"><input type="checkbox" id="lgRecordar" checked> Mantener la sesión en este celular (30 días)</label>
-      <small style="text-align:center">¿No tiene PIN o lo olvidó? Pídalo en recepción: le darán un PIN temporal.</small>
+      <small style="text-align:center">¿No tiene contraseña o la olvidó? Pídala en recepción: le darán una temporal.</small>
     </div>
   </section>
 
@@ -148,15 +174,35 @@
     </div>
   </div>
 
-  <!-- MODAL PIN -->
+  <!-- MODAL CONTRASEÑA -->
   <div id="mPin" class="modal hidden">
     <div class="modal-box">
-      <h3 id="mPinTit">Cree su PIN personal</h3>
-      <small id="mPinTxt">Elija 6 números que solo usted conozca. No use secuencias (123456), números repetidos (111111), su fecha de nacimiento ni parte de su cédula o celular.</small>
-      <label>Nuevo PIN<input id="pin1" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password"></label>
-      <label>Repita el PIN<input id="pin2" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password"></label>
-      <button class="btn btn-am" onclick="guardarPin()">Guardar PIN</button>
+      <h3 id="mPinTit">Cree su contraseña</h3>
+      <ul class="reglas-clave" id="mPinTxt">
+        <li>Mínimo 8 caracteres. Una frase fácil de recordar funciona muy bien, ej. <i>sentadilla los lunes</i>.</li>
+        <li>No use 12345678, su nombre, su cédula, su celular ni su fecha de nacimiento.</li>
+      </ul>
+      <label class="campo-clave">Nueva contraseña<input id="pin1" type="password" maxlength="64" autocomplete="new-password" oninput="medir()"><button type="button" class="ver-clave" aria-label="Mostrar contraseña" onclick="GymAPI.verClave(this)">👁</button></label>
+      <div class="medidor"><i id="medBar"></i></div><small id="medTxt"></small>
+      <label class="campo-clave">Repita la contraseña<input id="pin2" type="password" maxlength="64" autocomplete="new-password"><button type="button" class="ver-clave" aria-label="Mostrar contraseña" onclick="GymAPI.verClave(this)">👁</button></label>
+      <button class="btn btn-am" onclick="guardarPin()">Guardar contraseña</button>
       <button class="btn btn-os hidden" id="mPinCerrar" onclick="$('mPin').classList.add('hidden')">Cancelar</button>
+    </div>
+  </div>
+
+  <!-- MODAL POLÍTICA DE DATOS -->
+  <div id="mPol" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="polTit">
+    <div class="modal-box pol">
+      <h3 id="polTit" style="margin:0">Política de tratamiento de datos</h3>
+      <small id="polIntro">Para usar la app debe leer y aceptar cómo el gimnasio cuida sus datos.</small>
+      <div id="polTxt" class="pol-txt"></div>
+      <label class="acepto"><input type="checkbox" id="polAcepta"><span>Autorizo el tratamiento de mis datos personales según esta política (obligatorio)</span></label>
+      <label class="acepto"><input type="checkbox" id="polSens"><span>Autorizo mis datos sensibles: foto, rostro, huella y medidas corporales (opcional; sin esto la app no guarda su peso ni medidas)</span></label>
+      <div class="firma-caja"><canvas id="polFirma" class="firma" aria-label="Recuadro para firmar"></canvas>
+        <div class="firma-pie"><span>Firme con el dedo</span><button type="button" class="enlace" onclick="FirmaS.borrar()">Borrar firma</button></div></div>
+      <button class="btn btn-am" onclick="firmarPolitica()">Aceptar y firmar</button>
+      <button class="btn btn-os hidden" id="polCerrar" onclick="$('mPol').classList.add('hidden')">Cerrar</button>
+      <button class="enlace hidden" id="polSalir" onclick="$('mPol').classList.add('hidden'); salir()">No acepto: salir de la app</button>
     </div>
   </div>
 

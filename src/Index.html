@@ -1,246 +1,357 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
   <base target="_top">
   <meta charset="utf-8">
   <?!= include('Estilos'); ?>
 </head>
 <body>
-  <div id="loader" class="loader hidden"><div class="spin"></div></div>
-  <div id="toast" class="toast"></div>
+  <!-- Íconos de línea (se usan con <svg><use href="#i-..."/></svg>) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+      <symbol id="i-recepcion" viewBox="0 0 24 24"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 16l4-4-4-4M14 12H4"/></symbol>
+      <symbol id="i-socios" viewBox="0 0 24 24"><circle cx="9.5" cy="8" r="3.5"/><path d="M3 20v-1.2A3.8 3.8 0 0 1 6.8 15h5.4a3.8 3.8 0 0 1 3.8 3.8V20M16.5 4.6a3.5 3.5 0 0 1 0 6.8M21 20v-1.2a3.8 3.8 0 0 0-2.6-3.6"/></symbol>
+      <symbol id="i-tienda" viewBox="0 0 24 24"><path d="M5 8h14l-1.2 12H6.2L5 8zM9 8V7a3 3 0 0 1 6 0v1"/></symbol>
+      <symbol id="i-pesa" viewBox="0 0 24 24"><path d="M2.5 10v4M6 6.5v11M18 6.5v11M21.5 10v4M6 12h12"/></symbol>
+      <symbol id="i-informe" viewBox="0 0 24 24"><path d="M4 20V11M10 20V5M16 20v-6M2.5 20h19"/></symbol>
+      <symbol id="i-flecha" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+      <symbol id="i-salir" viewBox="0 0 24 24"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M15 8l4 4-4 4M19 12H9"/></symbol>
+      <symbol id="i-camara" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.4"/></symbol>
+      <symbol id="i-subir" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></symbol>
+      <symbol id="i-documento" viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6"/></symbol>
+      <symbol id="i-escudo" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></symbol>
+    </defs>
+  </svg>
 
-  <!-- ============ LOGIN ============ -->
+  <div id="loader" class="loader hidden"><div class="spin"></div></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="datosPagina" hidden data-url="<?= urlApp ?>" data-pase="<?= pase ?>"></div>
+
+  <!-- ============ INGRESO ÚNICO ============ -->
   <section id="login" class="login">
     <div class="login-box">
-      <div class="brand-big" id="lgGym">GIMNASIO</div>
-      <label>Usuario<input id="lgUser" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Su usuario"></label>
-      <label>PIN<input id="lgPin" type="password" inputmode="numeric" maxlength="12" autocomplete="current-password"></label>
-      <button class="btn btn-yellow w100" onclick="entrar()">Ingresar</button>
-      <a class="link-socio" href="<?= urlApp ?>?p=socio" target="_top">¿Eres socio? Entra a tu app de rutinas →</a>
+      <div class="login-marca"><span class="logo-tile"><svg><use href="#i-pesa"/></svg></span><span id="lgGym">GIMNASIO</span></div>
+      <p class="login-sub">Personal y socios entran por aquí</p>
+      <label for="lgUser">Usuario o cédula<input id="lgUser" name="username" required maxlength="80" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Su usuario o cédula"></label>
+      <label for="lgPin" class="campo-clave">Contraseña<input id="lgPin" name="password" type="password" required maxlength="64" autocomplete="current-password" inputmode="text" autocapitalize="none" autocorrect="off" spellcheck="false"><button type="button" class="ver-clave" aria-label="Mostrar contraseña" onclick="GymAPI.verClave(this)">👁</button></label>
+      <button class="btn btn-naranja w100" onclick="entrar()">Ingresar</button>
+      <label class="recordar"><input type="checkbox" id="lgRecordar" checked> Mantener la sesión en este equipo</label>
+      <small class="ayuda-login">¿No tiene contraseña o la olvidó? Pídala en recepción.</small>
     </div>
   </section>
 
   <!-- ============ APP ============ -->
   <div id="app" class="hidden">
     <header class="top">
-      <div class="brand"><span id="hdGym"></span><small id="hdTel"></small></div>
-      <div class="nequi" id="hdNequi"></div>
-      <div class="top-user"><span id="hdUser"></span><button class="btn btn-sm btn-light" onclick="salir()">Salir</button></div>
+      <button class="top-menu" id="btnMenu" aria-label="Abrir o cerrar el menú" aria-expanded="true" onclick="alternarMenu()"><svg><use href="#i-menu"/></svg></button>
+      <div class="brand"><span class="logo-tile"><svg><use href="#i-pesa"/></svg></span><span id="hdGym"></span></div>
+      <nav class="miga" aria-label="Ubicación"><span id="migaGrupo">Recepción</span><span class="miga-sep">›</span><span id="migaPagina">Inicio</span></nav>
+      <div class="top-der">
+        <span class="nequi" id="hdNequi"></span>
+        <span class="top-user"><span id="hdUser"></span><span class="rol" id="hdRol"></span></span>
+        <small class="top-tel" id="hdTel"></small>
+        <button class="btn-top" onclick="salir()"><svg><use href="#i-salir"/></svg>Salir</button>
+      </div>
     </header>
 
-    <nav class="tabs" id="tabs">
-      <button data-tab="panel" class="active">🏠 Inicio</button>
-      <button data-tab="ingreso">✅ Ingreso</button>
-      <button data-tab="miembros">👤 Miembros</button>
-      <button data-tab="pagos">💵 Pagos</button>
-      <button data-tab="tienda">🛒 Tienda</button>
-      <button data-tab="rutinas" class="solo-coach">🏋️ Rutinas</button>
-      <button data-tab="informes" class="solo-admin">📊 Informes</button>
-    </nav>
-
-    <main>
-      <!-- INICIO -->
-      <section id="tab-panel" class="tab">
-        <div class="kpis" id="pnKpis"></div>
-        <div class="grid2">
-          <div class="card"><h3>🎂 Cumpleaños</h3><div id="pnCumple"></div></div>
-          <div class="card"><h3>⏳ Próximos a vencer</h3><div id="pnVencer"></div></div>
-          <div class="card"><h3>❌ Vencidos (últimos 7 días)</h3><div id="pnVencidos"></div></div>
-          <div class="card"><h3>🚪 Ingresos de hoy</h3><div id="pnAsis" class="tabla-wrap"></div></div>
-        </div>
-      </section>
-
-      <!-- INGRESO -->
-      <section id="tab-ingreso" class="tab hidden">
-        <div class="grid2">
-          <div class="card">
-            <h3>Registrar ingreso</h3>
-            <div class="row">
-              <input id="inCodigo" class="big" placeholder="Cédula o ID de huella + Enter" autocomplete="off">
-              <button class="btn btn-yellow" onclick="ingresoManual()">Registrar</button>
-            </div>
-            <p class="hint">Si el lector de huellas está en modo teclado, escribe el ID aquí automáticamente.</p>
-            <h3>Reconocimiento facial</h3>
-            <div class="cam"><video id="inVideo" playsinline muted></video><div id="inFaceMsg" class="cam-msg">Cámara apagada</div></div>
-            <div class="row">
-              <button id="btnFacial" class="btn btn-dark" onclick="toggleFacial()">📷 Iniciar reconocimiento</button>
-              <label class="btn btn-light">🖼️ Foto<input type="file" accept="image/*" capture="user" hidden onchange="facialDesdeArchivo(this)"></label>
+    <div class="cuerpo">
+      <aside class="lateral" id="lateral">
+        <div class="lat-user"><b id="latNombre"></b><small id="latRol"></small></div>
+        <nav id="tabs" aria-label="Secciones">
+          <div class="grupo abierto" data-grupo="Recepción">
+            <button class="grupo-cab" aria-expanded="true" onclick="alternarGrupo(this)"><svg><use href="#i-recepcion"/></svg><span>Recepción</span><svg class="chev"><use href="#i-flecha"/></svg></button>
+            <div class="grupo-items">
+              <button data-tab="panel" class="active">Inicio del día</button>
+              <button data-tab="ingreso">Control de ingreso</button>
             </div>
           </div>
-          <div class="card"><div id="inFicha" class="vacio">Aquí aparecerá la información de la persona</div></div>
-        </div>
-      </section>
-
-      <!-- MIEMBROS -->
-      <section id="tab-miembros" class="tab hidden">
-        <div class="grid2">
-          <div class="card">
-            <h3 id="mTitulo">Nuevo miembro</h3>
-            <div class="form">
-              <label>Cédula<input id="mCedula" inputmode="numeric" onchange="cargarMiembro(this.value, true)"></label>
-              <label>Nombre completo<input id="mNombre"></label>
-              <label>Fecha de nacimiento<input id="mFnac" type="date"></label>
-              <label>Teléfono<input id="mTel" inputmode="tel"></label>
-              <label>Correo<input id="mCorreo" type="email"></label>
-              <label>ID de huella<input id="mHuella" placeholder="ID asignado en el lector"></label>
-              <label>Rutina asignada<select id="mRutina"></select></label>
-              <div class="full acceso-app">
-                <div><b>📱 App de socios:</b> <span id="mAppEstado" class="muted">—</span></div>
-                <button type="button" class="btn btn-dark btn-sm hidden" id="mBtnPin" onclick="darPin()">🔑 Generar PIN de acceso</button>
-              </div>
-              <label class="full">Comentarios<textarea id="mComent" rows="2"></textarea></label>
+          <div class="grupo abierto" data-grupo="Socios">
+            <button class="grupo-cab" aria-expanded="true" onclick="alternarGrupo(this)"><svg><use href="#i-socios"/></svg><span>Socios</span><svg class="chev"><use href="#i-flecha"/></svg></button>
+            <div class="grupo-items">
+              <button data-tab="miembros">Registro de socios</button>
+              <button data-tab="pagos">Pagos y planes</button>
             </div>
-            <div class="foto-box">
-              <div class="cam small"><video id="mVideo" playsinline muted></video><img id="mFoto" class="hidden" alt=""></div>
-              <div class="col">
-                <button class="btn btn-dark" onclick="mAbrirCam()">📷 Abrir cámara</button>
-                <button class="btn btn-yellow" onclick="mCapturar()">📸 Capturar</button>
-                <label class="btn btn-light">🖼️ Subir / tomar foto<input type="file" accept="image/*" capture="user" hidden onchange="mDesdeArchivo(this)"></label>
-                <div id="mRostro" class="badge gris">Sin rostro registrado</div>
+          </div>
+          <div class="grupo abierto" data-grupo="Tienda">
+            <button class="grupo-cab" aria-expanded="true" onclick="alternarGrupo(this)"><svg><use href="#i-tienda"/></svg><span>Tienda</span><svg class="chev"><use href="#i-flecha"/></svg></button>
+            <div class="grupo-items">
+              <button data-tab="tienda">Ventas y productos</button>
+            </div>
+          </div>
+          <div class="grupo abierto solo-coach" data-grupo="Entrenamiento">
+            <button class="grupo-cab" aria-expanded="true" onclick="alternarGrupo(this)"><svg><use href="#i-pesa"/></svg><span>Entrenamiento</span><svg class="chev"><use href="#i-flecha"/></svg></button>
+            <div class="grupo-items">
+              <button data-tab="rutinas">Rutinas y app de socios</button>
+            </div>
+          </div>
+          <div class="grupo abierto solo-admin" data-grupo="Administración">
+            <button class="grupo-cab" aria-expanded="true" onclick="alternarGrupo(this)"><svg><use href="#i-informe"/></svg><span>Administración</span><svg class="chev"><use href="#i-flecha"/></svg></button>
+            <div class="grupo-items">
+              <button data-tab="informes">Informe mensual</button>
+            </div>
+          </div>
+        </nav>
+      </aside>
+      <div class="velo" id="velo" onclick="alternarMenu(false)"></div>
+
+      <main>
+        <!-- INICIO -->
+        <section id="tab-panel" class="tab">
+          <div class="kpis" id="pnKpis"></div>
+          <div class="grid2">
+            <div class="card"><div class="card-cab"><h3>Cumpleaños</h3></div><div id="pnCumple"></div></div>
+            <div class="card"><div class="card-cab"><h3>Próximos a vencer</h3></div><div id="pnVencer"></div></div>
+            <div class="card"><div class="card-cab"><h3>Vencidos en los últimos 7 días</h3></div><div id="pnVencidos"></div></div>
+            <div class="card"><div class="card-cab"><h3>Ingresos de hoy</h3></div><div id="pnAsis" class="tabla-wrap"></div></div>
+          </div>
+        </section>
+
+        <!-- INGRESO -->
+        <section id="tab-ingreso" class="tab hidden">
+          <div class="grid2">
+            <div class="card">
+              <div class="card-cab"><h3>Registrar ingreso</h3></div>
+              <div class="row">
+                <input id="inCodigo" class="big" placeholder="Cédula o ID de huella y Enter" autocomplete="off">
+                <button class="btn btn-naranja" onclick="ingresoManual()">Registrar</button>
+              </div>
+              <p class="hint">Si el lector de huellas está en modo teclado, escribe el ID aquí automáticamente.</p>
+              <div class="sub-cab">Reconocimiento facial</div>
+              <div class="cam"><video id="inVideo" playsinline muted></video><div id="inFaceMsg" class="cam-msg">Cámara apagada</div></div>
+              <div class="row">
+                <button id="btnFacial" class="btn btn-marino" onclick="toggleFacial()"><svg><use href="#i-camara"/></svg>Iniciar reconocimiento</button>
+                <label class="btn btn-claro"><svg><use href="#i-subir"/></svg>Usar una foto<input type="file" accept="image/*" capture="user" hidden onchange="facialDesdeArchivo(this)"></label>
               </div>
             </div>
-            <div class="row">
-              <button class="btn btn-yellow" onclick="guardarMiembro()">💾 Guardar</button>
-              <button class="btn btn-light" onclick="limpiarMiembro()">Nuevo</button>
-              <button class="btn btn-dark" onclick="irAPago($('mCedula').value)">💵 Registrar pago</button>
-            </div>
-            <div id="mPagos"></div>
-            <div id="mProgreso" class="hidden">
-              <h3 style="margin-top:14px">📈 Progreso</h3>
-              <div id="mProgResumen" class="muted"></div>
-              <div id="mGrafPeso"></div>
-              <div class="form cols3" style="margin-top:8px">
-                <label>Peso kg<input id="mPeso" inputmode="decimal" placeholder="72.5"></label>
-                <label>Estatura cm<input id="mEst" inputmode="numeric" placeholder="170"></label>
-                <label>Cintura cm<input id="mCin" inputmode="decimal" placeholder="opcional"></label>
+            <div class="card"><div id="inFicha" class="vacio">Escriba una cédula o use el reconocimiento facial: aquí aparece la ficha de la persona.</div></div>
+          </div>
+        </section>
+
+        <!-- REGISTRO DE SOCIOS -->
+        <section id="tab-miembros" class="tab hidden">
+          <div class="grid-registro">
+            <div class="card">
+              <div class="card-cab">
+                <h3 id="mTitulo">Nuevo socio</h3>
+                <div class="card-acciones">
+                  <button class="btn btn-claro btn-sm" onclick="limpiarMiembro()">Nuevo</button>
+                  <button class="btn btn-marino btn-sm" onclick="guardarMiembro()">Guardar socio</button>
+                </div>
               </div>
-              <button class="btn btn-dark" onclick="registrarMedida()">⚖️ Registrar medida de hoy</button>
+
+              <fieldset class="bloque">
+                <legend>Datos personales</legend>
+                <div class="form">
+                  <label>Cédula<input id="mCedula" inputmode="numeric" onchange="cargarMiembro(this.value, true)"></label>
+                  <label>Nombre completo<input id="mNombre" autocomplete="off"></label>
+                  <label>Fecha de nacimiento<input id="mFnac" type="date"></label>
+                  <label>Teléfono (WhatsApp)<input id="mTel" inputmode="tel"></label>
+                  <label class="full">Correo<input id="mCorreo" type="email"></label>
+                </div>
+              </fieldset>
+
+              <fieldset class="bloque" id="bloquePolitica">
+                <legend>Política de tratamiento de datos</legend>
+                <div id="mPolEstado" class="pol-estado"></div>
+                <div id="mPolForm">
+                  <p class="hint">Ley 1581 de 2012. Lea o muestre la política a la persona; ella marca su decisión y firma con el dedo o el mouse.</p>
+                  <button type="button" class="btn btn-claro btn-sm" onclick="verPolitica()"><svg><use href="#i-documento"/></svg>Ver la política completa</button>
+                  <label class="check"><input type="checkbox" id="mPolAcepta"> Autorizo el tratamiento de mis datos personales según la política (obligatorio)</label>
+                  <label class="check"><input type="checkbox" id="mPolSensibles"> Autorizo mis datos sensibles: foto, rostro, huella y medidas corporales (opcional)</label>
+                  <div class="firma-caja">
+                    <canvas id="mFirma" class="firma" aria-label="Recuadro para firmar"></canvas>
+                    <div class="firma-pie"><span>Firma de la persona</span><button type="button" class="enlace" onclick="FirmaM.borrar()">Borrar firma</button></div>
+                  </div>
+                </div>
+              </fieldset>
+
+              <fieldset class="bloque">
+                <legend>Identificación en la entrada</legend>
+                <div class="foto-box">
+                  <div class="cam small"><video id="mVideo" playsinline muted></video><img id="mFoto" class="hidden" alt="Foto del socio"></div>
+                  <div class="col">
+                    <button class="btn btn-marino" onclick="mAbrirCam()"><svg><use href="#i-camara"/></svg>Abrir cámara</button>
+                    <button class="btn btn-naranja" onclick="mCapturar()">Tomar la foto</button>
+                    <label class="btn btn-claro"><svg><use href="#i-subir"/></svg>Subir o tomar foto<input type="file" accept="image/*" capture="user" hidden onchange="mDesdeArchivo(this)"></label>
+                    <div id="mRostro" class="badge gris">Sin rostro registrado</div>
+                  </div>
+                </div>
+                <div class="form">
+                  <label>ID de huella<input id="mHuella" placeholder="ID asignado en el lector"></label>
+                </div>
+                <p class="hint">Foto, rostro y huella solo se guardan si la persona autorizó los datos sensibles.</p>
+              </fieldset>
+
+              <fieldset class="bloque">
+                <legend>Entrenamiento y app</legend>
+                <div class="form">
+                  <label>Rutina asignada<select id="mRutina"></select></label>
+                  <div class="acceso-app">
+                    <div><b>App de socios</b><div id="mAppEstado" class="muted">—</div></div>
+                    <button type="button" class="btn btn-marino btn-sm hidden" id="mBtnPin" onclick="darPin()">Dar contraseña de acceso</button>
+                  </div>
+                  <label class="full">Comentarios<textarea id="mComent" rows="2"></textarea></label>
+                </div>
+              </fieldset>
+
+              <div class="barra-acciones">
+                <button class="btn btn-naranja" onclick="guardarMiembro()">Guardar socio</button>
+                <button class="btn btn-marino" onclick="irAPago($('mCedula').value)">Registrar pago</button>
+                <button class="btn btn-claro" onclick="limpiarMiembro()">Nuevo</button>
+              </div>
+
+              <div id="mPagos"></div>
+              <div id="mProgreso" class="hidden">
+                <div class="sub-cab">Progreso</div>
+                <div id="mProgResumen" class="muted"></div>
+                <div id="mGrafPeso"></div>
+                <div class="form cols3" style="margin-top:8px">
+                  <label>Peso kg<input id="mPeso" inputmode="decimal" placeholder="72.5"></label>
+                  <label>Estatura cm<input id="mEst" inputmode="numeric" placeholder="170"></label>
+                  <label>Cintura cm<input id="mCin" inputmode="decimal" placeholder="opcional"></label>
+                </div>
+                <button class="btn btn-marino" onclick="registrarMedida()">Registrar medida de hoy</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-cab"><h3>Socios registrados <span id="mCount" class="muted"></span></h3></div>
+              <input id="mBuscar" placeholder="Buscar por nombre o cédula" oninput="filtrarMiembros()">
+              <div class="tabla-wrap alto"><table class="tabla" id="mTabla"></table></div>
             </div>
           </div>
-          <div class="card">
-            <h3>Listado <span id="mCount" class="muted"></span></h3>
-            <input id="mBuscar" placeholder="Buscar por nombre o cédula" oninput="filtrarMiembros()">
-            <div class="tabla-wrap alto"><table class="tabla" id="mTabla"></table></div>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- PAGOS -->
-      <section id="tab-pagos" class="tab hidden">
-        <div class="card">
-          <h3>Registrar pago / inscripción</h3>
-          <div class="form cols3">
-            <label>Cédula<input id="pCedula" inputmode="numeric" onchange="pBuscar()"></label>
-            <label>Nombre<input id="pNombre"></label>
-            <label>Fecha de nacimiento<input id="pFnac" type="date"></label>
-            <label>Teléfono<input id="pTel" inputmode="tel"></label>
-            <label>Plan<select id="pPlan" onchange="pPlanCambio()"></select></label>
-            <label>Valor<input id="pValor" type="number" min="0"></label>
-            <label>Fecha ingreso<input id="pInicio" type="date" onchange="pCalcFin()"></label>
-            <label>Fecha terminación<input id="pFin" type="date" readonly></label>
-            <label>Medio de pago<select id="pMedio"></select></label>
-            <label class="full">Comentarios<input id="pComent"></label>
-          </div>
-          <div id="pEstado" class="muted"></div>
-          <button class="btn btn-yellow" onclick="registrarPago()">💾 Registrar pago</button>
-        </div>
-        <div class="card">
-          <div class="row between"><h3>Pagos del mes <span id="pResumen" class="muted"></span></h3><input type="month" id="pMes" onchange="cargarPagosMes()"></div>
-          <div class="tabla-wrap"><table class="tabla" id="pTabla"></table></div>
-        </div>
-      </section>
-
-      <!-- TIENDA -->
-      <section id="tab-tienda" class="tab hidden">
-        <div class="card solo-admin">
-          <h3>Producto</h3>
-          <input type="hidden" id="tId">
-          <div class="form cols3">
-            <label>Nombre<input id="tNombre"></label>
-            <label>Categoría<input id="tCat" placeholder="Bebidas, suplementos…"></label>
-            <label>Precio<input id="tPrecio" type="number" min="0"></label>
-            <label>Stock<input id="tStock" type="number"></label>
-            <label class="check"><input type="checkbox" id="tActivo" checked> Activo</label>
-          </div>
-          <div class="row">
-            <button class="btn btn-yellow" onclick="guardarProducto()">💾 Guardar producto</button>
-            <button class="btn btn-light" onclick="limpiarProducto()">Nuevo</button>
-          </div>
-        </div>
-        <div class="card"><h3>Productos</h3><div id="tProductos" class="productos"></div></div>
-        <div class="card"><h3>Ventas de hoy <span id="tTotalHoy" class="muted"></span></h3><div class="tabla-wrap"><table class="tabla" id="tVentas"></table></div></div>
-      </section>
-
-      <!-- RUTINAS -->
-      <section id="tab-rutinas" class="tab hidden">
-        <div class="card row between">
-          <div><b>📱 App de socios:</b> <span class="muted">cada socio activo entra con su cédula y un PIN. Recepción entrega un PIN temporal (vence en 7 días) y en el primer ingreso el socio crea su PIN personal.</span>
-            <div class="row solo-admin" style="margin:6px 0 0"><button class="btn btn-yellow btn-sm" onclick="darAccesoTodos()">📲 Dar acceso a todos los activos sin PIN</button></div></div>
-          <div class="row" style="margin:0">
-            <input id="rUrlSocio" readonly style="min-width:240px;flex:1">
-            <button class="btn btn-light" onclick="copiarLinkSocio()">Copiar</button>
-          </div>
-        </div>
-        <div class="grid2 grid-rut">
+        <!-- PAGOS -->
+        <section id="tab-pagos" class="tab hidden">
           <div class="card">
-            <div class="row between"><h3 style="margin:0">Rutinas</h3><button class="btn btn-yellow btn-sm" onclick="nuevaRutina()">+ Nueva rutina</button></div>
-            <div id="rLista"></div>
-          </div>
-          <div class="card">
-            <h3 id="rTitulo">Nueva rutina</h3>
-            <input type="hidden" id="rId">
-            <div class="form">
-              <label class="full">Nombre<input id="rNombre" placeholder="Ej: Hipertrofia Torso / Pierna"></label>
-              <label>Objetivo<input id="rObjetivo" placeholder="Ganar masa, bajar de peso…"></label>
-              <label>Nivel<select id="rNivel"><option>Principiante</option><option>Intermedio</option><option>Avanzado</option><option>Todos</option></select></label>
-              <label class="full">Descripción / indicaciones<textarea id="rDesc" rows="2"></textarea></label>
-              <label class="check"><input type="checkbox" id="rActivo" checked> Visible para los socios</label>
+            <div class="card-cab"><h3>Registrar pago o renovación</h3></div>
+            <div class="form cols3">
+              <label>Cédula<input id="pCedula" inputmode="numeric" onchange="pBuscar()"></label>
+              <label>Nombre<input id="pNombre"></label>
+              <label>Fecha de nacimiento<input id="pFnac" type="date"></label>
+              <label>Teléfono<input id="pTel" inputmode="tel"></label>
+              <label>Plan<select id="pPlan" onchange="pPlanCambio()"></select></label>
+              <label>Valor<input id="pValor" type="number" min="0"></label>
+              <label>Fecha de ingreso<input id="pInicio" type="date" onchange="pCalcFin()"></label>
+              <label>Fecha de terminación<input id="pFin" type="date" readonly></label>
+              <label>Medio de pago<select id="pMedio"></select></label>
+              <label class="full">Comentarios<input id="pComent"></label>
             </div>
-            <div class="prev-anim">
-              <div id="rPrev" class="prev-fig"></div>
-              <div><b id="rPrevNom">Vista previa</b><div id="rPrevTip" class="muted">Haga clic en un ejercicio para ver su animación.</div></div>
-            </div>
-            <div class="tabla-wrap">
-              <table class="tabla editor" id="rEjercicios"></table>
+            <div id="pEstado" class="muted"></div>
+            <button class="btn btn-naranja" onclick="registrarPago()">Registrar pago</button>
+          </div>
+          <div class="card">
+            <div class="card-cab"><h3>Pagos del mes <span id="pResumen" class="muted"></span></h3><input type="month" id="pMes" class="input-auto" onchange="cargarPagosMes()"></div>
+            <div class="tabla-wrap"><table class="tabla" id="pTabla"></table></div>
+          </div>
+        </section>
+
+        <!-- TIENDA -->
+        <section id="tab-tienda" class="tab hidden">
+          <div class="card solo-admin">
+            <div class="card-cab"><h3>Producto</h3></div>
+            <input type="hidden" id="tId">
+            <div class="form cols3">
+              <label>Nombre<input id="tNombre"></label>
+              <label>Categoría<input id="tCat" placeholder="Bebidas, suplementos…"></label>
+              <label>Precio<input id="tPrecio" type="number" min="0"></label>
+              <label>Stock<input id="tStock" type="number"></label>
+              <label class="check"><input type="checkbox" id="tActivo" checked> Activo</label>
             </div>
             <div class="row">
-              <button class="btn btn-light btn-sm" onclick="agregarFilaEj(false)">+ Ejercicio</button>
-              <button class="btn btn-light btn-sm" onclick="agregarFilaEj(true)">+ Día nuevo</button>
+              <button class="btn btn-naranja" onclick="guardarProducto()">Guardar producto</button>
+              <button class="btn btn-claro" onclick="limpiarProducto()">Nuevo</button>
             </div>
-            <div class="row">
-              <button class="btn btn-yellow" onclick="guardarRutina()">💾 Guardar rutina</button>
-              <button class="btn btn-light" onclick="duplicarRutina()">Duplicar</button>
-            </div>
-            <p class="hint">"Animación" en Automática se elige según el nombre del ejercicio; puede cambiarla o quitarla. En "Video" puede pegar un enlace de YouTube o Instagram.</p>
           </div>
-        </div>
-      </section>
+          <div class="card"><div class="card-cab"><h3>Productos</h3></div><div id="tProductos" class="productos"></div></div>
+          <div class="card"><div class="card-cab"><h3>Ventas de hoy <span id="tTotalHoy" class="muted"></span></h3></div><div class="tabla-wrap"><table class="tabla" id="tVentas"></table></div></div>
+        </section>
 
-      <!-- INFORMES -->
-      <section id="tab-informes" class="tab hidden">
-        <div class="card row no-print">
-          <label>Mes <input type="month" id="iMes"></label>
-          <button class="btn btn-yellow" onclick="generarInforme()">Generar informe</button>
-          <button class="btn btn-light" onclick="window.print()">🖨️ Imprimir</button>
-        </div>
-        <div id="iContenido"></div>
-      </section>
-    </main>
+        <!-- RUTINAS -->
+        <section id="tab-rutinas" class="tab hidden">
+          <div class="card">
+            <div class="card-cab"><h3>App de socios</h3></div>
+            <p class="muted" style="margin-top:0">Cada socio activo entra con su cédula y su contraseña. Recepción entrega una contraseña temporal (vence en 7 días) y en el primer ingreso el socio crea la suya. La app solo funciona mientras su membresía esté activa.</p>
+            <div class="row">
+              <input id="rUrlSocio" readonly style="min-width:240px;flex:1">
+              <button class="btn btn-claro" onclick="copiarLinkSocio()">Copiar enlace</button>
+              <button class="btn btn-naranja solo-admin" onclick="darAccesoTodos()">Dar acceso a los activos sin contraseña</button>
+            </div>
+          </div>
+          <div class="grid2 grid-rut">
+            <div class="card">
+              <div class="card-cab"><h3>Rutinas</h3><button class="btn btn-marino btn-sm" onclick="nuevaRutina()">Nueva rutina</button></div>
+              <div id="rLista"></div>
+            </div>
+            <div class="card">
+              <div class="card-cab"><h3 id="rTitulo">Nueva rutina</h3></div>
+              <input type="hidden" id="rId">
+              <div class="form">
+                <label class="full">Nombre<input id="rNombre" placeholder="Ej: Hipertrofia torso y pierna"></label>
+                <label>Objetivo<input id="rObjetivo" placeholder="Ganar masa, bajar de peso…"></label>
+                <label>Nivel<select id="rNivel"><option>Principiante</option><option>Intermedio</option><option>Avanzado</option><option>Todos</option></select></label>
+                <label class="full">Descripción e indicaciones<textarea id="rDesc" rows="2"></textarea></label>
+                <label class="check"><input type="checkbox" id="rActivo" checked> Visible para los socios</label>
+              </div>
+              <div class="prev-anim">
+                <div id="rPrev" class="prev-fig"></div>
+                <div><b id="rPrevNom">Vista previa</b><div id="rPrevTip" class="muted">Haga clic en un ejercicio para ver su animación.</div></div>
+              </div>
+              <div class="tabla-wrap">
+                <table class="tabla editor" id="rEjercicios"></table>
+              </div>
+              <div class="row">
+                <button class="btn btn-claro btn-sm" onclick="agregarFilaEj(false)">Agregar ejercicio</button>
+                <button class="btn btn-claro btn-sm" onclick="agregarFilaEj(true)">Agregar día</button>
+              </div>
+              <div class="row">
+                <button class="btn btn-naranja" onclick="guardarRutina()">Guardar rutina</button>
+                <button class="btn btn-claro" onclick="duplicarRutina()">Duplicar</button>
+              </div>
+              <p class="hint">"Animación" en Automática se elige según el nombre del ejercicio; puede cambiarla o quitarla. En "Video" puede pegar un enlace de YouTube o Instagram.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- INFORMES -->
+        <section id="tab-informes" class="tab hidden">
+          <div class="card no-print">
+            <div class="row" style="margin:0">
+              <label class="en-linea">Mes <input type="month" id="iMes" class="input-auto"></label>
+              <button class="btn btn-marino" onclick="generarInforme()">Generar informe</button>
+              <button class="btn btn-claro" onclick="window.print()">Imprimir</button>
+            </div>
+          </div>
+          <div id="iContenido"></div>
+        </section>
+      </main>
+    </div>
   </div>
 
-  <!-- MODAL: PIN ENTREGADO A UN SOCIO -->
+  <!-- MODAL: POLÍTICA DE DATOS -->
+  <div id="mPolitica" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="polTit">
+    <div class="modal-box ancho">
+      <div class="card-cab"><h3 id="polTit">Política de tratamiento de datos</h3><span class="muted" id="polVer"></span></div>
+      <div id="polTexto" class="politica-texto"></div>
+      <div class="row"><button class="btn btn-marino" onclick="$('mPolitica').classList.add('hidden')">Cerrar</button></div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONTRASEÑA TEMPORAL ENTREGADA A UN SOCIO -->
   <div id="mAcceso" class="modal hidden">
     <div class="modal-box">
-      <h3>🔑 Acceso a la app de socios</h3>
-      <div id="mAccNombre" style="font-weight:800"></div>
+      <h3>Acceso a la app de socios</h3>
+      <div id="mAccNombre" style="font-weight:700"></div>
       <div class="muted">Cédula <span id="mAccCed"></span></div>
       <div class="pin-grande" id="mAccPin"></div>
       <div class="muted" id="mAccVence"></div>
-      <div class="alerta amarillo" style="margin:0;font-size:13px">Este PIN solo se muestra ahora. Envíelo al socio; en su primer ingreso creará su PIN personal.</div>
+      <div class="alerta amarillo" style="margin:0;font-size:14px">Esta contraseña temporal solo se muestra ahora. Envíela al socio: en su primer ingreso creará la suya.</div>
       <div id="mAccWa"></div>
       <div class="row">
-        <button class="btn btn-light" onclick="copiarTexto(S.msgAcceso)">📋 Copiar mensaje</button>
-        <button class="btn btn-yellow" onclick="$('mAcceso').classList.add('hidden')">Listo</button>
+        <button class="btn btn-claro" onclick="copiarTexto(S.msgAcceso)">Copiar mensaje</button>
+        <button class="btn btn-naranja" onclick="$('mAcceso').classList.add('hidden')">Listo</button>
       </div>
     </div>
   </div>
@@ -248,24 +359,28 @@
   <!-- MODAL: ACCESO MASIVO -->
   <div id="mMasivo" class="modal hidden">
     <div class="modal-box ancho">
-      <h3>📲 PIN entregados <span id="mMasCant" class="muted"></span></h3>
-      <div class="alerta amarillo" style="margin:0;font-size:13px">Estos PIN solo se muestran ahora. Envíelos uno por uno con WhatsApp o copie la lista antes de cerrar.</div>
+      <h3>Contraseñas temporales entregadas <span id="mMasCant" class="muted"></span></h3>
+      <div class="alerta amarillo" style="margin:0;font-size:14px">Solo se muestran ahora. Envíelas una por una con WhatsApp o copie la lista antes de cerrar.</div>
       <div class="tabla-wrap" style="max-height:55vh"><table class="tabla" id="mMasTabla"></table></div>
       <div class="row">
-        <button class="btn btn-light" onclick="copiarTexto(S.listaMasiva)">📋 Copiar lista</button>
-        <button class="btn btn-yellow" onclick="if(confirm('¿Ya envió o copió los PIN? No se podrán volver a ver.'))$('mMasivo').classList.add('hidden')">Cerrar</button>
+        <button class="btn btn-claro" onclick="copiarTexto(S.listaMasiva)">Copiar lista</button>
+        <button class="btn btn-naranja" onclick="if(confirm('¿Ya envió o copió las contraseñas? No se podrán volver a ver.'))$('mMasivo').classList.add('hidden')">Cerrar</button>
       </div>
     </div>
   </div>
 
-  <!-- MODAL: CAMBIO DE PIN DEL PERSONAL -->
+  <!-- MODAL: CONTRASEÑA DEL PERSONAL -->
   <div id="mPinStaff" class="modal hidden">
     <div class="modal-box">
-      <h3>🔒 Cree un PIN seguro</h3>
-      <div class="muted">Su PIN actual es muy fácil de adivinar. Elija uno de 6 números que no sea una secuencia (123456), repetido (111111) ni una fecha.</div>
-      <label>Nuevo PIN<input id="stPin1" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password"></label>
-      <label>Repita el PIN<input id="stPin2" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password"></label>
-      <button class="btn btn-yellow" onclick="guardarPinStaff()">Guardar PIN</button>
+      <h3>Cree su contraseña</h3>
+      <ul class="reglas-clave">
+        <li>Mínimo 8 caracteres. Puede usar una frase, ej. <i>pesas al amanecer</i>.</li>
+        <li>No use 12345678, su nombre, el nombre del gimnasio ni fechas.</li>
+      </ul>
+      <label class="campo-clave">Nueva contraseña<input id="stPin1" type="password" maxlength="64" autocomplete="new-password" oninput="medirClave(this, 'stMed')"><button type="button" class="ver-clave" aria-label="Mostrar contraseña" onclick="GymAPI.verClave(this)">👁</button></label>
+      <div class="medidor"><i id="stMed"></i></div><small id="stMedTxt" class="muted"></small>
+      <label class="campo-clave">Repita la contraseña<input id="stPin2" type="password" maxlength="64" autocomplete="new-password"><button type="button" class="ver-clave" aria-label="Mostrar contraseña" onclick="GymAPI.verClave(this)">👁</button></label>
+      <button class="btn btn-naranja" onclick="guardarPinStaff()">Guardar contraseña</button>
     </div>
   </div>
 
@@ -279,8 +394,8 @@
       <label>Cédula del cliente (opcional)<input id="vCed" inputmode="numeric"></label>
       <div class="total" id="vTotalTxt"></div>
       <div class="row">
-        <button class="btn btn-yellow" onclick="confirmarVenta()">Vender</button>
-        <button class="btn btn-light" onclick="cerrarModal()">Cancelar</button>
+        <button class="btn btn-naranja" onclick="confirmarVenta()">Vender</button>
+        <button class="btn btn-claro" onclick="cerrarModal()">Cancelar</button>
       </div>
     </div>
   </div>

@@ -33,7 +33,7 @@ const PAGINAS = [
 ];
 
 const VERSION = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 12) + '-' +
-  crypto.createHash('sha1').update(fs.readdirSync(path.join(RAIZ, 'src')).map(f => leer('src/' + f)).join('') + JSON.stringify(cfg)).digest('hex').slice(0, 8);
+  crypto.createHash('sha1').update(fs.readdirSync(path.join(RAIZ, 'src')).map(f => leer('src/' + f)).join('') + JSON.stringify(cfg) + leer('pwa/sw.js')).digest('hex').slice(0, 8);
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -69,20 +69,67 @@ const GUARDIA = `(function(){
 
 const PIE = `<script>
 (function(){
-  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-    navigator.serviceWorker.register('sw.js').catch(function(){});
+  var cfg = window.GYM_CONFIG || {};
+  var login = document.querySelector('.login-box');
+  if (login) {
+    var ver = document.createElement('small');
+    ver.textContent = 'Versión: ' + (cfg.VERSION || 'sin identificar');
+    ver.style.cssText = 'display:block;text-align:center;color:#667085;font:500 11px/1.4 system-ui,sans-serif;padding-top:6px';
+    login.appendChild(ver);
   }
-  // Botón "Instalar app" cuando el navegador lo permite
-  var evt = null;
-  window.addEventListener('beforeinstallprompt', function (e) {
-    e.preventDefault(); evt = e;
-    var b = document.createElement('button');
-    b.textContent = '📲 Instalar app';
-    b.setAttribute('style', 'position:fixed;right:14px;bottom:86px;z-index:300;background:#FFC000;color:#000;border:2px solid #000;border-radius:999px;padding:10px 16px;font-weight:800;font-size:14px;box-shadow:0 4px 14px rgba(0,0,0,.35);cursor:pointer');
-    b.onclick = function () { evt.prompt(); evt.userChoice.finally(function () { b.remove(); }); };
-    document.body.appendChild(b);
-    setTimeout(function () { if (b.isConnected) b.remove(); }, 30000);
+  if (!('serviceWorker' in navigator) || !(location.protocol === 'https:' || location.hostname === 'localhost')) return;
+  var recargando = false;
+  var controlaba = !!navigator.serviceWorker.controller;
+  var aviso = null;
+  navigator.serviceWorker.addEventListener('controllerchange', function () {
+    if (recargando && controlaba) location.reload();
   });
+  function avisarActualizacion(reg) {
+    if (!reg || !reg.waiting || aviso) return;
+    aviso = document.createElement('aside');
+    aviso.setAttribute('role', 'status');
+    aviso.setAttribute('aria-live', 'polite');
+    aviso.style.cssText = 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);width:min(92vw,560px);z-index:10000;display:flex;align-items:center;gap:10px;padding:14px 16px;background:#111;color:#fff;border:1px solid #555;border-radius:14px;box-shadow:0 8px 28px rgba(0,0,0,.35);font:600 14px/1.35 system-ui,sans-serif';
+    var texto = document.createElement('span');
+    texto.textContent = 'Hay una nueva versión de ' + (cfg.NOMBRE || 'KING GYM') + '.';
+    texto.style.flex = '1';
+    var actualizar = document.createElement('button');
+    actualizar.type = 'button';
+    actualizar.textContent = 'Actualizar';
+    actualizar.setAttribute('aria-label', 'Actualizar la app ahora');
+    actualizar.style.cssText = 'border:0;border-radius:9px;padding:10px 13px;background:#FFC000;color:#111;font:700 14px system-ui,sans-serif;cursor:pointer;white-space:nowrap';
+    actualizar.addEventListener('click', function () {
+      if (!reg.waiting) return;
+      recargando = true;
+      actualizar.disabled = true;
+      actualizar.textContent = 'Actualizando…';
+      reg.waiting.postMessage({ type: 'ACTIVATE_UPDATE' });
+    });
+    var luego = document.createElement('button');
+    luego.type = 'button';
+    luego.textContent = 'Luego';
+    luego.setAttribute('aria-label', 'Recordarme después');
+    luego.style.cssText = 'border:0;background:transparent;color:#fff;font:600 13px system-ui,sans-serif;cursor:pointer;white-space:nowrap';
+    luego.addEventListener('click', function () { aviso.remove(); aviso = null; });
+    aviso.appendChild(texto);
+    aviso.appendChild(actualizar);
+    aviso.appendChild(luego);
+    document.body.appendChild(aviso);
+  }
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(function (reg) {
+    function revisar() { reg.update().catch(function () {}); }
+    revisar();
+    if (reg.waiting) avisarActualizacion(reg);
+    reg.addEventListener('updatefound', function () {
+      var nuevo = reg.installing;
+      if (!nuevo) return;
+      nuevo.addEventListener('statechange', function () {
+        if (nuevo.state === 'installed' && navigator.serviceWorker.controller) avisarActualizacion(reg);
+      });
+    });
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) revisar(); });
+    window.setInterval(function () { if (!document.hidden) revisar(); }, 60 * 60 * 1000);
+  }).catch(function () {});
 })();
 </script>`;
 

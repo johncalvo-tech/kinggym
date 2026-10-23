@@ -1,32 +1,30 @@
-/* Service worker: permite instalar la app y abrirla rápido.
- * Solo guarda en caché los archivos de la app (nunca datos de miembros).
- * Las llamadas al servidor (Google) siempre van por internet. */
+/* Service worker: actualizaciones con aviso; no almacena datos de miembros. */
 const VERSION = '__VERSION__';
 const CACHE = 'gym-' + VERSION;
 const ARCHIVOS = __ARCHIVOS__;
 
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARCHIVOS)).then(() => self.skipWaiting()));
+self.addEventListener('install', event => {
+  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ARCHIVOS)));
 });
-
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('gym-') && k !== CACHE).map(k => caches.delete(k))))
-      .then(() => self.clients.claim())
-  );
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'ACTIVATE_UPDATE') self.skipWaiting();
 });
-
-self.addEventListener('fetch', e => {
-  const req = e.request;
-  const url = new URL(req.url);
-  if (req.method !== 'GET' || url.origin !== self.location.origin) return;   // API y CDN: directo a internet
-  if (req.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname.endsWith('config.js')) {
-    // Páginas: primero internet (para recibir actualizaciones), si no hay, la copia guardada
-    e.respondWith(
-      fetch(req).then(r => { const copia = r.clone(); caches.open(CACHE).then(c => c.put(req, copia)); return r; })
-        .catch(() => caches.match(req, { ignoreSearch: true }).then(r => r || caches.match('index.html')))
-    );
+self.addEventListener('activate', event => {
+  event.waitUntil(caches.keys()
+    .then(keys => Promise.all(keys.filter(key => key.startsWith('gym-') && key !== CACHE).map(key => caches.delete(key))))
+    .then(() => self.clients.claim()));
+});
+self.addEventListener('fetch', event => {
+  const request = event.request;
+  const url = new URL(request.url);
+  if (request.method !== 'GET' || url.origin !== self.location.origin) return;
+  if (request.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname.endsWith('config.js')) {
+    event.respondWith(fetch(request).then(response => {
+      const copy = response.clone();
+      caches.open(CACHE).then(cache => cache.put(url.origin + url.pathname, copy));
+      return response;
+    }).catch(() => caches.match(request, { ignoreSearch: true }).then(response => response || caches.match('index.html'))));
     return;
   }
-  e.respondWith(caches.match(req).then(r => r || fetch(req)));
+  event.respondWith(caches.match(request).then(response => response || fetch(request)));
 });
