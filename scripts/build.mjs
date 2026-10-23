@@ -14,10 +14,14 @@ const LEGIBLE = process.argv.includes('--legible');
 
 const leer = p => fs.readFileSync(path.join(RAIZ, p), 'utf8');
 const cfg = JSON.parse(leer('config.json'));
+cfg.API_URL = String(cfg.API_URL || '').trim();
 
 // ---------- Validaciones ----------
-if (!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(cfg.API_URL || '')) {
-  throw new Error('config.json: API_URL debe ser la URL de la app web de Apps Script (termina en /exec).');
+if (/PEGUE/i.test(cfg.API_URL || '')) {
+  throw new Error('config.json: falta pegar en API_URL la URL de su app web de Apps Script (Implementar > Administrar implementaciones).');
+}
+if (!/^https:\/\/script\.google\.com\/(a\/[\w.-]+\/macros|a\/macros\/[\w.-]+|macros)\/s\/[\w-]+\/exec$/.test(String(cfg.API_URL || '').trim())) {
+  throw new Error('config.json: API_URL debe ser la URL de la app web de Apps Script (empieza por https://script.google.com y termina en /exec).');
 }
 const dominios = (cfg.DOMINIOS_PERMITIDOS || []).filter(d => d && !/TU-USUARIO/i.test(d));
 if (!dominios.length) console.warn('⚠️  config.json: DOMINIOS_PERMITIDOS sin configurar; la app funcionará en cualquier dominio.');
@@ -38,10 +42,10 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 const CSP = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://cdn.jsdelivr.net",
-  "style-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "img-src 'self' data: blob:",
   "media-src 'self' blob:",
-  "font-src 'self' data:",
+  "font-src 'self' data: https://fonts.gstatic.com",
   "connect-src 'self' https://script.google.com https://script.googleusercontent.com https://cdn.jsdelivr.net",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
@@ -104,6 +108,7 @@ function cabecera(p) {
 function armar(p) {
   let h = leer('src/' + p.src + '.html');
   h = h.replace(/<\?= urlApp \?>\?p=socio/g, 'socio.html');
+  h = h.replace(/<\?= (urlApp|pase) \?>/g, '');   // en GitHub el pase llega en la dirección (?h=)
   h = h.replace(/<\?!= include\('(\w+)'\); \?>/g, (_, n) => leer('src/' + n + '.html'));
   if (/<\?/.test(h)) throw new Error(p.src + ': quedó una instrucción de Apps Script sin convertir');
   if (!/<meta charset="utf-8">/.test(h)) throw new Error(p.src + ': falta <meta charset="utf-8">');
