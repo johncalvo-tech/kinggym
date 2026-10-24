@@ -260,6 +260,7 @@
             <input type="hidden" id="tId">
             <div class="form cols3">
               <label>Nombre<input id="tNombre"></label>
+              <label>Código de barras<input id="tCodigoBarras" autocomplete="off" placeholder="Escanee o escriba el código"></label>
               <label>Categoría<input id="tCat" placeholder="Bebidas, suplementos…"></label>
               <label>Precio<input id="tPrecio" type="number" min="0"></label>
               <label>Stock<input id="tStock" type="number"></label>
@@ -269,6 +270,11 @@
               <button class="btn btn-naranja" onclick="guardarProducto()">Guardar producto</button>
               <button class="btn btn-claro" onclick="limpiarProducto()">Nuevo</button>
             </div>
+          </div>
+          <div class="card">
+            <div class="card-cab"><h3>Caja rápida</h3></div>
+            <p class="hint">Escanee el código del producto con el lector USB o escríbalo y presione Enter.</p>
+            <input id="tScan" class="big" autocomplete="off" placeholder="Escanear código de barras para vender">
           </div>
           <div class="card"><div class="card-cab"><h3>Productos</h3></div><div id="tProductos" class="productos"></div></div>
           <div class="card"><div class="card-cab"><h3>Ventas de hoy <span id="tTotalHoy" class="muted"></span></h3></div><div class="tabla-wrap"><table class="tabla" id="tVentas"></table></div></div>
@@ -418,3 +424,6 @@
   <?!= include('JavaScript'); ?>
 </body>
 </html>
+
+
+The focused UI element is 1 AXWebArea 127.0.0.1:8145/Index.html
