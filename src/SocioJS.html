@@ -201,6 +201,42 @@ function diasDe(r) {
   return Object.keys(set).map(Number).sort(function (a, b) { return a - b; });
 }
 
+/* Reto semanal: meta elegida por el socio, guardada en este dispositivo.
+ * Se cuentan días únicos de entrenamiento para que varios ejercicios
+ * guardados el mismo día no inflen el avance. */
+function inicioSemana(iso) {
+  var p = String(iso || '').split('-').map(Number);
+  var d = new Date(p[0], p[1] - 1, p[2]);
+  d.setDate(d.getDate() - (d.getDay() + 6) % 7);
+  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
+}
+function metaReto() {
+  var id = 'retoSemanal:' + (S.d && S.d.perfil ? S.d.perfil.cedula : 'socio'), n = 3;
+  try { n = Number(localStorage.getItem(id)) || 3; } catch (e) { }
+  return Math.max(2, Math.min(4, n));
+}
+function entrenosEstaSemana() {
+  var desde = inicioSemana(S.d.hoy), fechas = {};
+  S.d.historial.forEach(function (x) { if (x.fecha >= desde && x.fecha <= S.d.hoy) fechas[x.fecha] = 1; });
+  return Object.keys(fechas).length;
+}
+function elegirMetaReto(n) {
+  try { localStorage.setItem('retoSemanal:' + S.d.perfil.cedula, String(n)); } catch (e) { }
+  renderRutina();
+}
+function htmlRetoSemanal() {
+  var meta = metaReto(), hechos = entrenosEstaSemana(), pct = Math.min(100, Math.round(hechos / meta * 100));
+  var opciones = [2, 3, 4].map(function (n) {
+    return '<button type="button" class="reto-opcion' + (n === meta ? ' activo' : '') + '" aria-pressed="' + (n === meta) + '" onclick="elegirMetaReto(' + n + ')">' + n + '</button>';
+  }).join('');
+  return '<section class="card reto" aria-labelledby="retoTit"><div class="fila entre"><div><span class="reto-etiqueta">RETO DE ESTA SEMANA</span>' +
+    '<h3 id="retoTit" style="margin:3px 0">Muévete a tu ritmo 💪</h3></div><span class="reto-contador">' + Math.min(hechos, meta) + '/' + meta + '</span></div>' +
+    '<p class="sub" style="margin:5px 0 9px">Elige cuántos días quieres entrenar esta semana. También cuenta descansar entre sesiones.</p>' +
+    '<div class="reto-metas" role="group" aria-label="Meta semanal de entrenamientos">' + opciones + '<small>sesiones por semana</small></div>' +
+    '<div class="reto-progreso" role="progressbar" aria-label="Progreso del reto semanal" aria-valuemin="0" aria-valuemax="' + meta + '" aria-valuenow="' + Math.min(hechos, meta) + '"><i style="width:' + pct + '%"></i></div>' +
+    '<small>' + (hechos >= meta ? '¡Reto cumplido! Gran constancia. El descanso también hace parte del progreso. 🎉' : 'Llevas ' + hechos + ' de ' + meta + ' días de entrenamiento esta semana.') + '</small></section>';
+}
+
 /* =====================================================================
  *  RUTINA
  * ===================================================================== */
@@ -215,6 +251,8 @@ function renderRutina() {
     '<small>' + esc([r.objetivo, r.nivel].filter(String).join(' · ')) + '</small></div>' +
     '<button class="btn btn-os btn-sm" onclick="S.eligiendo=true;renderRutina()">Cambiar</button></div>' +
     (r.descripcion ? '<p class="sub" style="margin:10px 0 0;font-size:14px">' + esc(r.descripcion) + '</p>' : '') + '</div>';
+
+  h += htmlRetoSemanal();
 
   h += '<div class="dias">' + dias.map(function (n) {
     return '<button class="' + (n === S.dia ? 'activo' : '') + '" onclick="cambiarDia(' + n + ')">Día ' + n + '</button>';
@@ -371,6 +409,7 @@ function htmlElegirRutina() {
   var d = S.d;
   var h = '<h2>' + (d.rutina ? 'Cambiar de rutina' : 'Elija su rutina') + '</h2>' +
     '<p class="sub" style="margin-top:-4px">También puede pedirle a su entrenador que le asigne una.</p>';
+  h += htmlRetoSemanal();
   if (!d.rutinas.length) h += '<div class="card sub">El gimnasio aún no ha publicado rutinas.</div>';
   h += d.rutinas.map(function (r) {
     var actual = d.rutina && d.rutina.id === r.id;
