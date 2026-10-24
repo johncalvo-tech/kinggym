@@ -11,6 +11,9 @@ var GymAPI = (function () {
 
   function porGoogle(fn, args) {
     return new Promise(function (res, rej) {
+      if (typeof google.script.run[fn] !== 'function') {
+        return rej(new Error('El servidor está desactualizado: falta la función "' + fn + '". Reemplace Code.gs en Apps Script y publique una nueva versión (Implementar > Administrar implementaciones > Nueva versión).'));
+      }
       var r = google.script.run.withSuccessHandler(res).withFailureHandler(function (e) {
         rej(new Error((e && e.message) || String(e)));
       });
@@ -42,7 +45,119 @@ var GymAPI = (function () {
     }).finally(function () { clearTimeout(reloj); });
   }
 
+  // Indicador de fortaleza (orientativo; la regla real la aplica el servidor)
+  function fuerza(c) {
+    c = String(c || '');
+    if (!c) return { pct: 0, txt: '', color: 'transparent' };
+    var p = 0, tipos = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter(function (r) { return r.test(c); }).length;
+    p += Math.min(c.length, 16) * 5 + tipos * 8;
+    if (/^(.)\1+$/.test(c) || /^(\d+|[a-z]+)$/i.test(c) && c.length < 10) p -= 25;
+    if (c.length < 8) return { pct: Math.max(10, p / 2), txt: 'Muy corta: mínimo 8 caracteres', color: '#C53030' };
+    if (p < 60) return { pct: 45, txt: 'Aceptable', color: '#B7791F' };
+    if (p < 85) return { pct: 75, txt: 'Buena', color: '#1F9D55' };
+    return { pct: 100, txt: 'Muy buena', color: '#1F9D55' };
+  }
+
+  // Botón para mostrar u ocultar la contraseña
+  function verClave(btn) {
+    var i = btn.parentNode.querySelector('input');
+    i.type = i.type === 'password' ? 'text' : 'password';
+    btn.textContent = i.type === 'password' ? '👁' : '🙈';
+    btn.setAttribute('aria-label', i.type === 'password' ? 'Mostrar contraseña' : 'Ocultar contraseña');
+  }
+
+  /* ---------- Ingreso único ----------
+   * Todos entran por la misma pantalla. Si quien entra es de la otra sección
+   * (un socio en recepción o alguien del personal en la app de socios), se le
+   * lleva allá con un "pase" de un solo uso que vence en 2 minutos. */
+  function datosPagina() { return document.getElementById('datosPagina') || { dataset: {} }; }
+  function urlSeccion(seccion, pase) {
+    var base = datosPagina().dataset.url || '';
+    if (enGoogle && base) return base + (seccion === 'socio' ? '?p=socio&h=' : '?h=') + encodeURIComponent(pase);
+    return new URL(seccion === 'socio' ? 'socio.html' : 'index.html', location.href).href + '?h=' + encodeURIComponent(pase);
+  }
+  function saltar(seccion, pase) {
+    var url = urlSeccion(seccion, pase);
+    try { (enGoogle ? window.top : window).location.href = url; } catch (e) { }
+    // Respaldo: si el navegador no deja cambiar de página solo, queda un botón
+    var caja = document.querySelector('.login-box');
+    if (caja && !document.getElementById('btnSalto')) {
+      var a = document.createElement('a');
+      a.id = 'btnSalto'; a.href = url; a.target = '_top'; a.className = 'btn w100 btn-salto';
+      a.textContent = seccion === 'socio' ? 'Abrir mis rutinas →' : 'Abrir recepción →';
+      caja.appendChild(a);
+    }
+  }
+  function paseInicial() {
+    var p = datosPagina().dataset.pase || '';
+    if (!p) { try { p = new URLSearchParams(location.search).get('h') || ''; } catch (e) { } }
+    if (p && !enGoogle && history.replaceState) { try { history.replaceState(null, '', location.pathname); } catch (e) { } }
+    return String(p).replace(/[^A-Za-z0-9]/g, '');
+  }
+
+  /* ---------- Firma con el dedo o el mouse ----------
+   * GymAPI.firma(canvas) -> { vacia(), borrar(), imagen() }  imagen() = PNG liviano (data URL) */
+  function firma(canvas) {
+    var ctx = canvas.getContext('2d'), trazos = 0, dib = false, ult = null;
+    function ajustar() {
+      var r = canvas.getBoundingClientRect(), k = window.devicePixelRatio || 1;
+      if (!r.width) return;
+      var copia = trazos ? canvas.toDataURL() : null;
+      canvas.width = Math.round(r.width * k); canvas.height = Math.round(r.height * k);
+      ctx.setTransform(k, 0, 0, k, 0, 0);
+      ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0A1F44';
+      if (copia) { var im = new Image(); im.onload = function () { ctx.drawImage(im, 0, 0, r.width, r.height); }; im.src = copia; }
+    }
+    function punto(e) { var r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+    canvas.addEventListener('pointerdown', function (e) {
+      if (!canvas.width || canvas.width < 10) ajustar();
+      dib = true; ult = punto(e); canvas.setPointerCapture(e.pointerId);
+      ctx.beginPath(); ctx.arc(ult.x, ult.y, 1, 0, Math.PI * 2); ctx.fillStyle = '#0A1F44'; ctx.fill();
+      trazos++; e.preventDefault();
+    });
+    canvas.addEventListener('pointermove', function (e) {
+      if (!dib) return;
+      var p = punto(e);
+      ctx.beginPath(); ctx.moveTo(ult.x, ult.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+      ult = p; trazos++; e.preventDefault();
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) { canvas.addEventListener(ev, function () { dib = false; }); });
+    window.addEventListener('resize', function () { if (canvas.offsetParent) ajustar(); });
+    setTimeout(ajustar, 0);
+    return {
+      vacia: function () { return trazos < 8; },   // un punto suelto no cuenta como firma
+      borrar: function () { trazos = 0; ajustar(); ctx.clearRect(0, 0, canvas.width, canvas.height); },
+      ajustar: ajustar,
+      imagen: function () {
+        // Fondo blanco y máximo 600 px de ancho: pesa poco y se ve bien impresa
+        var w = Math.min(600, canvas.width), h = Math.round(canvas.height * w / canvas.width);
+        var c = document.createElement('canvas'); c.width = w; c.height = h;
+        var x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, w, h); x.drawImage(canvas, 0, 0, w, h);
+        return c.toDataURL('image/png');
+      }
+    };
+  }
+
+  /* ---------- Cámara: motivo claro cuando no abre ---------- */
+  function motivoCamara(e) {
+    var n = (e && e.name) || '', bloqueadaAqui = false;
+    try { bloqueadaAqui = !!(document.featurePolicy && document.featurePolicy.allowsFeature && !document.featurePolicy.allowsFeature('camera')); } catch (x) { }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return 'Este navegador no permite usar la cámara aquí. Use "Subir o tomar foto".';
+    if (bloqueadaAqui) return 'Dentro del enlace de Google el navegador no deja usar la cámara en vivo. Use "Subir o tomar foto" (en el celular abre la cámara) o la app publicada en GitHub.';
+    if (n === 'NotAllowedError' || n === 'SecurityError') return 'La cámara está bloqueada. Toque el ícono de la cámara o del candado en la barra de direcciones, elija "Permitir" y vuelva a intentarlo. También puede usar "Subir o tomar foto".';
+    if (n === 'NotFoundError' || n === 'DevicesNotFoundError') return 'No se encontró una cámara conectada a este equipo. Use "Subir o tomar foto".';
+    if (n === 'NotReadableError' || n === 'TrackStartError') return 'Otra aplicación está usando la cámara (Zoom, Teams, WhatsApp…). Ciérrela y vuelva a intentarlo.';
+    return 'No se pudo abrir la cámara. Use "Subir o tomar foto".';
+  }
+
   return {
+    version: '2026.10.26',
+    firma: firma,
+    motivoCamara: motivoCamara,
+    saltar: saltar,
+    paseInicial: paseInicial,
+    fuerza: fuerza,
+    verClave: verClave,
     enGoogle: enGoogle,
     cfg: cfg,
     call: function (fn, args) { return enGoogle ? porGoogle(fn, args || []) : porFetch(fn, args || []); }

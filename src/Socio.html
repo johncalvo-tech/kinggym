@@ -137,8 +137,13 @@
   <section id="vLogin" class="login">
     <div class="login-box">
       <div class="marca"><span id="lgGym">MI GIMNASIO</span><small>Tus rutinas y tu progreso</small></div>
-      <label for="lgCed">Cédula o usuario<input id="lgCed" name="username" required maxlength="80" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Su cédula o usuario"></label>
-      <label for="lgPin" class="campo-clave">Contraseña<input id="lgPin" name="password" type="password" required maxlength="64" autocomplete="current-password" inputmode="text" autocapitalize="none" autocorrect="off" spellcheck="false"><button type="button" class="ver-clave" aria-label="Mostrar contraseña" onclick="GymAPI.verClave(this)">👁</button></label>
+      <label>Cédula o usuario<input id="lgCed" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Socios: su cédula · Personal: su usuario"></label>
+      <label for="lgPin">Contraseña</label>
+      <div class="campo-clave">
+        <input id="lgPin" type="password" maxlength="64" autocomplete="current-password" inputmode="text" enterkeyhint="go" autocapitalize="none" spellcheck="false" aria-describedby="lgPasswordHelp">
+        <button type="button" class="ver-clave" aria-label="Mostrar contraseña" onclick="GymAPI.verClave(this)">👁</button>
+      </div>
+      <small id="lgPasswordHelp">Puede incluir letras y números.</small>
       <button class="btn btn-am w100" onclick="entrar()">Entrar</button>
       <label class="recordar"><input type="checkbox" id="lgRecordar" checked> Mantener la sesión en este celular (30 días)</label>
       <small style="text-align:center">¿No tiene contraseña o la olvidó? Pídala en recepción: le darán una temporal.</small>

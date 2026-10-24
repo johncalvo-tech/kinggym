@@ -40,18 +40,37 @@ window.addEventListener('load', async function () {
   $('lgPin').addEventListener('keydown', function (e) { if (e.key === 'Enter') entrar(); });
   $('lgCed').value = leerLocal('socioCed');
   llamar('infoPublica', []).then(function (i) { $('lgGym').textContent = i.gym; }).catch(function () { });
+  // ¿Viene de la pantalla de ingreso con un pase?
+  var pase = GymAPI.paseInicial();
+  if (pase) {
+    try {
+      var rp = await llamar('canjearPase', [pase]);
+      if (rp.tipo !== 'SOCIO') throw new Error('no');
+      S.token = rp.token;
+      if (rp.recordar) guardarLocal('socioToken', rp.token);
+      else try { sessionStorage.setItem('socioToken', rp.token); } catch (e) { }
+      if (rp.debeCambiar) abrirPin(true);
+      return cargar();
+    } catch (e) { /* pase vencido o ya usado: sigue con la sesión guardada */ }
+  }
   var tk = leerLocal('socioToken');
   if (!tk) try { tk = sessionStorage.getItem('socioToken') || ''; } catch (e) { }
   if (tk) { S.token = tk; await cargar(); }
 });
 
+// Pantalla de ingreso ÚNICA: socios con cédula, personal con su usuario
 async function entrar() {
-  var ced = $('lgCed').value.trim(), pin = $('lgPin').value.trim();
-  if (!ced || !pin) return toast('Escriba su cédula y su PIN', 'err');
+  var ced = $('lgCed').value.trim(), pin = $('lgPin').value;
+  if (!ced || !pin) return toast('Escriba su cédula (o usuario) y su contraseña', 'err');
   var recordar = $('lgRecordar').checked;
-  var r = await conCarga(llamar('loginSocio', [ced, pin, recordar]));
+  var r = await conCarga(llamar('ingresar', [ced, pin, recordar]));
   if (!r) return;
   $('lgPin').value = '';
+  if (r.tipo === 'PERSONAL') {
+    try { localStorage.setItem('gymUsuario', ced); } catch (e) { }
+    toast('Abriendo recepción…', 'ok');
+    return GymAPI.saltar('personal', r.pase);
+  }
   S.token = r.token;
   // Con "mantener sesión" el acceso queda en el celular; si no, se borra al cerrar el navegador
   if (recordar) guardarLocal('socioToken', r.token);
@@ -89,6 +108,31 @@ async function cargar() {
   if (d.perfil.cumpleHoy) toast('¡Feliz cumpleaños! 🎉 Que tengas un gran entrenamiento', 'ok');
   renderTodo();
   verTab(S.tab);
+  if (d.politica && d.politica.pendiente) abrirPolitica(true);
+}
+
+/* ---------- Política de tratamiento de datos ---------- */
+async function abrirPolitica(obligatoria) {
+  if (!S.pol) { try { S.pol = await llamar('politica', []); } catch (e) { return toast(e.message, 'err'); } }
+  $('polTxt').textContent = S.pol.texto;
+  $('polAcepta').checked = false;
+  $('polSens').checked = !!(S.d && S.d.politica && S.d.politica.sensibles);
+  $('polIntro').textContent = obligatoria ? 'Para usar la app debe leer y aceptar cómo el gimnasio cuida sus datos.' : 'Puede firmar de nuevo para cambiar su decisión sobre los datos sensibles.';
+  $('polCerrar').classList.toggle('hidden', !!obligatoria);
+  $('polSalir').classList.toggle('hidden', !obligatoria);
+  $('mPol').classList.remove('hidden');
+  if (!window.FirmaS) window.FirmaS = GymAPI.firma($('polFirma'));
+  setTimeout(function () { FirmaS.borrar(); }, 30);
+}
+async function firmarPolitica() {
+  if (!$('polAcepta').checked) return toast('Marque la casilla de autorización para continuar', 'err');
+  if (FirmaS.vacia()) return toast('Firme en el recuadro blanco', 'err');
+  var r = await conCarga(api('aceptarPoliticaSocio', { datos: true, sensibles: $('polSens').checked, firma: FirmaS.imagen() }));
+  if (!r) return;
+  S.d.politica = { pendiente: false, sensibles: r.sensibles };
+  $('mPol').classList.add('hidden');
+  toast('Gracias. Su autorización quedó registrada', 'ok');
+  renderPerfil();
 }
 
 function renderTodo() { renderRutina(); renderProgreso(); renderHistorial(); renderPerfil(); }
@@ -101,23 +145,29 @@ function verTab(t) {
   window.scrollTo(0, 0);
 }
 
-/* ---------- PIN ---------- */
+/* ---------- Contraseña ---------- */
 function abrirPin(obligatorio) {
   S.pinObligatorio = obligatorio;
   $('pin1').value = ''; $('pin2').value = '';
-  $('mPinTit').textContent = obligatorio ? 'Cree su PIN personal' : 'Cambiar PIN';
+  $('mPinTit').textContent = obligatorio ? 'Cree su contraseña' : 'Cambiar contraseña';
+  medir();
   $('mPinCerrar').classList.toggle('hidden', obligatorio);
   $('mPin').classList.remove('hidden');
   setTimeout(function () { $('pin1').focus(); }, 50);
 }
+function medir() {
+  var f = GymAPI.fuerza($('pin1').value);
+  $('medBar').style.width = f.pct + '%'; $('medBar').style.background = f.color; $('medTxt').textContent = f.txt;
+}
+
 async function guardarPin() {
-  var a = $('pin1').value.trim(), b = $('pin2').value.trim();
-  if (!/^\d{6}$/.test(a)) return toast('El PIN debe tener 6 números', 'err');
-  if (a !== b) return toast('Los PIN no coinciden', 'err');
+  var a = $('pin1').value, b = $('pin2').value;
+  if (a.length < 8) return toast('La contraseña debe tener al menos 8 caracteres', 'err');
+  if (a !== b) return toast('Las contraseñas no coinciden', 'err');
   var ok = await conCarga(api('cambiarPinSocio', a));
   if (!ok) return;
   $('mPin').classList.add('hidden');
-  toast('PIN guardado ✓', 'ok');
+  toast('Contraseña guardada ✓', 'ok');
 }
 
 /* =====================================================================
@@ -454,7 +504,10 @@ function renderPerfil() {
     '<div class="fila entre" style="margin-top:8px"><span class="sub">Ingresos este mes</span><b>' + S.d.asistenciasMes + '</b></div></div>' +
     '<div class="card"><b>' + esc(g.nombre) + '</b>' + (g.telefono ? '<div class="sub" style="margin-top:4px">📞 ' + esc(g.telefono) + '</div>' : '') +
     (g.nequi ? '<div class="sub">Nequi ' + esc(g.nequi) + '</div>' : '') + '</div>' +
-    '<button class="btn btn-os w100" onclick="abrirPin(false)">🔒 Cambiar PIN</button>' +
+    '<div class="card"><b>Política de datos</b><div class="sub" style="margin-top:4px">' +
+      (S.d.politica && !S.d.politica.pendiente ? 'Firmada' + (S.d.politica.sensibles ? ', con datos sensibles' : ', sin datos sensibles') : 'Pendiente de firma') +
+      '</div><button class="btn btn-os w100" style="margin-top:10px" onclick="abrirPolitica(false)">Ver o firmar de nuevo</button></div>' +
+    '<button class="btn btn-os w100" onclick="abrirPin(false)">Cambiar contraseña</button>' +
     '<button class="btn btn-os w100" style="margin-top:10px" onclick="salir()">Salir</button>';
 }
 </script>

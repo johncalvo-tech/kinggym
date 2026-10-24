@@ -33,8 +33,13 @@
     <div class="login-box">
       <div class="login-marca"><span class="logo-tile"><svg><use href="#i-pesa"/></svg></span><span id="lgGym">GIMNASIO</span></div>
       <p class="login-sub">Personal y socios entran por aquí</p>
-      <label for="lgUser">Usuario o cédula<input id="lgUser" name="username" required maxlength="80" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Su usuario o cédula"></label>
-      <label for="lgPin" class="campo-clave">Contraseña<input id="lgPin" name="password" type="password" required maxlength="64" autocomplete="current-password" inputmode="text" autocapitalize="none" autocorrect="off" spellcheck="false"><button type="button" class="ver-clave" aria-label="Mostrar contraseña" onclick="GymAPI.verClave(this)">👁</button></label>
+      <label>Usuario o cédula<input id="lgUser" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Personal: su usuario. Socios: su cédula"></label>
+      <label for="lgPin">Contraseña</label>
+      <div class="campo-clave">
+        <input id="lgPin" type="password" maxlength="64" autocomplete="current-password" inputmode="text" enterkeyhint="go" autocapitalize="none" spellcheck="false" aria-describedby="lgPasswordHelp">
+        <button type="button" class="ver-clave" aria-label="Mostrar contraseña" onclick="GymAPI.verClave(this)">👁</button>
+      </div>
+      <small id="lgPasswordHelp" class="ayuda-login">Puede incluir letras y números.</small>
       <button class="btn btn-naranja w100" onclick="entrar()">Ingresar</button>
       <label class="recordar"><input type="checkbox" id="lgRecordar" checked> Mantener la sesión en este equipo</label>
       <small class="ayuda-login">¿No tiene contraseña o la olvidó? Pídala en recepción.</small>

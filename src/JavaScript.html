@@ -6,7 +6,8 @@ var S = {
   token: '', user: null, cfg: {}, planes: [], medios: [], productos: [], miembros: [],
   tab: 'panel', facePromise: null, matcher: null, nombres: {}, escaneando: false, tFacial: null,
   fotoNueva: '', descNuevo: null, audio: null,
-  rutinas: [], rutinasFull: [], filas: [], urlSocio: '', miembroActual: null
+  rutinas: [], rutinasFull: [], filas: [], urlSocio: '', miembroActual: null,
+  mem: {}, politica: null
 };
 var FACE_JS = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js';
 var FACE_MODELOS = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
@@ -49,45 +50,103 @@ async function conCarga(promesa) {
 
 /* ---------- inicio / sesión ---------- */
 window.addEventListener('load', async function () {
-  document.querySelectorAll('#tabs button').forEach(function (b) { b.onclick = function () { mostrarTab(b.dataset.tab); }; });
+  document.querySelectorAll('#tabs button[data-tab]').forEach(function (b) { b.onclick = function () { mostrarTab(b.dataset.tab); }; });
+  restaurarMenu();
+  window.FirmaM = GymAPI.firma($('mFirma'));
   $('lgPin').addEventListener('keydown', function (e) { if (e.key === 'Enter') entrar(); });
   $('inCodigo').addEventListener('keydown', function (e) { if (e.key === 'Enter') ingresoManual(); });
   try {
     var info = await llamar('infoLogin', [], false);
     $('lgGym').textContent = info.gym;
+    avisoVersion(info.version);
     try { $('lgUser').value = localStorage.getItem('gymUsuario') || ''; } catch (e) { }
     $('lgUser').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('lgPin').focus(); });
   } catch (e) { toast(e.message, 'err'); }
+  // ¿Viene de la otra pantalla con un pase de ingreso?
+  var pase = GymAPI.paseInicial();
+  if (pase) {
+    try {
+      var rp = await llamar('canjearPase', [pase], false);
+      if (rp.tipo === 'PERSONAL') return abrirSesionPersonal(rp.token, rp.debeCambiar, '');
+    } catch (e) { /* pase vencido o ya usado: sigue con la sesión guardada o el login */ }
+  }
   var guardado = '';
-  try { guardado = sessionStorage.getItem('gymToken') || ''; } catch (e) { }
+  try { guardado = localStorage.getItem('gymToken') || ''; } catch (e) { }
   if (guardado) { S.token = guardado; try { await iniciarApp(); } catch (e) { S.token = ''; } }
 });
 
+// Pantalla de ingreso ÚNICA: el personal escribe su usuario y los socios su cédula
 async function entrar() {
-  var usuario = $('lgUser').value.trim(), pin = $('lgPin').value.trim();
-  if (!usuario || !pin) return toast('Escriba su usuario y su PIN', 'err');
-  var r = await conCarga(llamar('login', [usuario, pin], false));
+  var usuario = $('lgUser').value.trim(), pin = $('lgPin').value;
+  if (!usuario || !pin) return toast('Escriba su usuario (o cédula) y su contraseña', 'err');
+  var recordar = $('lgRecordar') ? $('lgRecordar').checked : true;
+  var r = await conCarga(llamar('ingresar', [usuario, pin, recordar], false));
   if (!r) return;
-  try { localStorage.setItem('gymUsuario', usuario); } catch (e) { }
-  S.token = r.token;
-  S.pinActual = r.debeCambiar ? pin : '';
-  try { sessionStorage.setItem('gymToken', r.token); } catch (e) { }
   $('lgPin').value = '';
+  if (r.tipo === 'SOCIO') {
+    guardarSesionSocio(r.token, recordar, usuario);
+    toast('¡Bienvenido! Abriendo sus rutinas…', 'ok');
+    return GymAPI.saltar('socio', r.pase);
+  }
+  try { localStorage.setItem('gymUsuario', usuario); } catch (e) { }
+  await abrirSesionPersonal(r.token, r.debeCambiar, pin);
+}
+
+// El socio sigue con su sesión al llegar a su app (y si recarga la página)
+function guardarSesionSocio(token, recordar, cedula) {
+  try {
+    if (recordar !== false) localStorage.setItem('socioToken', token);
+    else sessionStorage.setItem('socioToken', token);
+    if (cedula) localStorage.setItem('socioCed', cedula);
+  } catch (e) { }
+}
+
+async function abrirSesionPersonal(token, debeCambiar, pin) {
+  S.token = token;
+  S.pinActual = debeCambiar ? pin : '';
+  try { localStorage.setItem('gymToken', token); } catch (e) { }
   cargando(true);
   try { await iniciarApp(); } catch (e) { toast(e.message, 'err'); } finally { cargando(false); }
-  if (r.debeCambiar) { $('stPin1').value = ''; $('stPin2').value = ''; $('mPinStaff').classList.remove('hidden'); $('stPin1').focus(); }
+  if (debeCambiar) { $('stPin1').value = ''; $('stPin2').value = ''; $('mPinStaff').classList.remove('hidden'); $('stPin1').focus(); }
 }
 
 async function guardarPinStaff() {
-  var a = $('stPin1').value.trim(), b = $('stPin2').value.trim();
-  if (!/^\d{6}$/.test(a)) return toast('El PIN debe tener 6 números', 'err');
-  if (a !== b) return toast('Los PIN no coinciden', 'err');
+  var a = $('stPin1').value, b = $('stPin2').value;
+  if (a.length < 8) return toast('La contraseña debe tener al menos 8 caracteres', 'err');
+  if (a !== b) return toast('Las contraseñas no coinciden', 'err');
   var ok = await conCarga(api('cambiarPinUsuario', S.pinActual, a));
   if (!ok) return;
   S.pinActual = '';
   $('mPinStaff').classList.add('hidden');
-  toast('PIN actualizado ✓', 'ok');
+  toast('Contraseña guardada ✓', 'ok');
 }
+
+function medirClave(inp, id) {
+  var f = GymAPI.fuerza(inp.value);
+  $(id).style.width = f.pct + '%'; $(id).style.background = f.color;
+  $(id + 'Txt').textContent = f.txt;
+}
+
+// Aviso si las pantallas y el servidor (Code.gs) no son de la misma versión
+function avisoVersion(vServidor) {
+  if (vServidor === GymAPI.version || document.querySelector('.aviso-version')) return;
+  var d = document.createElement('div');
+  d.className = 'aviso-version';
+  d.textContent = vServidor
+    ? 'La app no está completa: el servidor (Code.gs) es de la versión ' + vServidor + ' y las pantallas de la ' + GymAPI.version + '. Reemplace Code.gs y publique una nueva versión.'
+    : 'El servidor (Code.gs) está desactualizado. Reemplácelo en Apps Script y publique una nueva versión.';
+  document.body.appendChild(d);
+}
+
+// Cierre por inactividad: Config > MINUTOS_INACTIVIDAD (por defecto 240 = 4 horas; 0 = nunca)
+(function () {
+  var ultimo = Date.now();
+  ['click', 'keydown', 'mousemove', 'touchstart'].forEach(function (ev) { document.addEventListener(ev, function () { ultimo = Date.now(); }, { passive: true }); });
+  setInterval(function () {
+    var min = S.cfg && S.cfg.MINUTOS_INACTIVIDAD !== undefined ? Number(S.cfg.MINUTOS_INACTIVIDAD) : 240;
+    if (S.token && min > 0 && Date.now() - ultimo > min * 60000) { salir(); toast('Sesión cerrada tras ' + min + ' minutos sin uso', 'err'); }
+  }, 60000);
+})();
 
 async function iniciarApp() {
   var d = await api('datosIniciales');
@@ -97,20 +156,28 @@ async function iniciarApp() {
   $('hdGym').textContent = S.cfg.GYM_NOMBRE;
   $('hdTel').textContent = S.cfg.GYM_TELEFONO;
   $('hdNequi').textContent = S.cfg.NEQUI ? 'NEQUI ' + S.cfg.NEQUI : '';
-  $('hdUser').textContent = '👤 ' + S.user.nombre;
+  $('hdUser').textContent = S.user.nombre;
+  var rolTxt = { ADMIN: 'Administrador', VENDEDOR: 'Recepción', ENTRENADOR: 'Entrenador' }[String(S.user.rol).toUpperCase()] || S.user.rol;
+  $('hdRol').textContent = rolTxt; $('latNombre').textContent = S.user.nombre; $('latRol').textContent = rolTxt;
   document.body.classList.toggle('es-admin', esAdmin());
   document.body.classList.toggle('es-coach', esAdmin() || String(S.user.rol).toUpperCase() === 'ENTRENADOR');
   llenarSelects();
   $('login').classList.add('hidden');
   $('app').classList.remove('hidden');
   mostrarTab('panel');
+  // Precarga en segundo plano: al abrir Registro o Tienda ya está todo listo
+  setTimeout(function () {
+    rapido('miembros', 'listarMiembros', [], function (l) { S.miembros = l; if (S.tab === 'miembros') filtrarMiembros(); }, true);
+    rapido('tienda', 'tienda', [], function (t) { if (S.tab === 'tienda') renderTienda(t); else S.productos = t.productos; }, true);
+    llamar('politica', [], false).then(function (p) { S.politica = p; }).catch(function () { });
+  }, 600);
 }
 
 function salir() {
   detenerFacial(); Cam.cerrar();
   if (S.token) { var t = S.token; GymAPI.call('logout', [t]).catch(function () { }); }
   S.token = ''; S.user = null;
-  try { sessionStorage.removeItem('gymToken'); } catch (e) { }
+  try { localStorage.removeItem('gymToken'); } catch (e) { }
   $('app').classList.add('hidden');
   $('login').classList.remove('hidden');
 }
@@ -120,7 +187,17 @@ function mostrarTab(t) {
   S.tab = t;
   document.querySelectorAll('.tab').forEach(function (s) { s.classList.add('hidden'); });
   $('tab-' + t).classList.remove('hidden');
-  document.querySelectorAll('#tabs button').forEach(function (b) { b.classList.toggle('active', b.dataset.tab === t); });
+  var actual = null;
+  document.querySelectorAll('#tabs button[data-tab]').forEach(function (b) { b.classList.toggle('active', b.dataset.tab === t); if (b.dataset.tab === t) actual = b; });
+  if (actual) {
+    var g = actual.closest('.grupo');
+    if (g && !g.classList.contains('abierto')) alternarGrupo(g.querySelector('.grupo-cab'));
+    $('migaGrupo').textContent = g ? g.dataset.grupo : '';
+    $('migaPagina').textContent = actual.textContent;
+    document.title = actual.textContent + ' · ' + ((S.cfg && S.cfg.GYM_NOMBRE) || 'Gimnasio');
+  }
+  if (window.innerWidth <= 900) alternarMenu(false);
+  if (t === 'miembros') setTimeout(function () { FirmaM.ajustar(); }, 30);
   if (t === 'panel') cargarPanel();
   if (t === 'ingreso') setTimeout(function () { $('inCodigo').focus(); }, 50);
   if (t === 'miembros') cargarMiembros();
@@ -129,6 +206,58 @@ function mostrarTab(t) {
   if (t === 'rutinas') cargarRutinas();
   if (t === 'informes' && !$('iMes').value) $('iMes').value = mesActual();
 }
+
+/* ---------- Menú lateral con grupos desplegables ---------- */
+function alternarGrupo(cab) {
+  var g = cab.closest('.grupo'), abierto = !g.classList.contains('abierto');
+  g.classList.toggle('abierto', abierto);
+  cab.setAttribute('aria-expanded', abierto ? 'true' : 'false');
+  guardarMenu();
+}
+function alternarMenu(forzar) {
+  var movil = window.innerWidth <= 900;
+  var clase = movil ? 'menu-abierto' : 'menu-cerrado';
+  var b = document.body, activo = b.classList.contains(clase);
+  var nuevo = typeof forzar === 'boolean' ? (movil ? forzar : !forzar) : !activo;
+  b.classList.toggle(clase, nuevo);
+  var visible = movil ? b.classList.contains('menu-abierto') : !b.classList.contains('menu-cerrado');
+  $('btnMenu').setAttribute('aria-expanded', visible ? 'true' : 'false');
+  if (!movil) guardarMenu();
+}
+function guardarMenu() {
+  try {
+    var cerrados = [].map.call(document.querySelectorAll('.grupo:not(.abierto)'), function (g) { return g.dataset.grupo; });
+    localStorage.setItem('gymMenu', JSON.stringify({ cerrados: cerrados, oculto: document.body.classList.contains('menu-cerrado') }));
+  } catch (e) { }
+}
+function restaurarMenu() {
+  try {
+    var m = JSON.parse(localStorage.getItem('gymMenu') || '{}');
+    (m.cerrados || []).forEach(function (n) {
+      var g = document.querySelector('.grupo[data-grupo="' + n + '"]');
+      if (g) { g.classList.remove('abierto'); g.querySelector('.grupo-cab').setAttribute('aria-expanded', 'false'); }
+    });
+    if (m.oculto && window.innerWidth > 900) document.body.classList.add('menu-cerrado');
+  } catch (e) { }
+}
+
+/* ---------- Carga rápida ----------
+ * Muestra al instante lo último que se cargó y lo actualiza en segundo plano.
+ * Solo la primera vez aparece el indicador de carga. */
+async function rapido(clave, fn, args, pintar, silencioso) {
+  var tenia = S.mem[clave], v;
+  if (tenia) pintar(tenia.v);
+  var p = llamar(fn, args || [], true);
+  if (tenia || silencioso) {
+    var barra = document.createElement('div'); barra.className = 'cargando-suave';
+    if (!silencioso) document.body.appendChild(barra);
+    try { v = await p; } catch (e) { if (!silencioso) toast(e.message, 'err'); return; } finally { barra.remove(); }
+  } else v = await conCarga(p);
+  if (v === undefined || v === null) return;
+  var j = JSON.stringify(v);
+  if (!tenia || tenia.j !== j) { S.mem[clave] = { v: v, j: j }; pintar(v); }
+}
+function olvidar(clave) { delete S.mem[clave]; }
 
 function llenarSelects() {
   $('pPlan').innerHTML = S.planes.map(function (p) { return '<option value="' + esc(p.plan) + '">' + esc(p.plan) + ' — ' + cop(p.valor) + '</option>'; }).join('');
@@ -163,9 +292,8 @@ function msgCumple(x) { return '¡Feliz cumpleaños ' + x.nombre.split(' ')[0] +
 /* =====================================================================
  *  INICIO
  * ===================================================================== */
-async function cargarPanel() {
-  var p = await conCarga(api('panel'));
-  if (!p) return;
+function cargarPanel() { return rapido('panel', 'panel', [], pintarPanel); }
+function pintarPanel(p) {
   $('pnKpis').innerHTML =
     kpi('Miembros activos', p.activos, 'de ' + p.totalMiembros + ' registrados') +
     kpi('Ingresos hoy', p.ingresosHoy) +
@@ -173,7 +301,7 @@ async function cargarPanel() {
     kpi('Por vencer', p.porVencer.length, 'próximos ' + p.diasAlerta + ' días');
 
   $('pnCumple').innerHTML =
-    lista(p.cumpleHoy, function (x) { return '<li><span>🎂 <b>' + esc(x.nombre) + '</b> cumple ' + x.edad + ' HOY</span>' + wa(x.telefono, msgCumple(x)) + '</li>'; }, 'Nadie cumple años hoy') +
+    lista(p.cumpleHoy, function (x) { return '<li><span><b>' + esc(x.nombre) + '</b> cumple ' + x.edad + ' HOY</span>' + wa(x.telefono, msgCumple(x)) + '</li>'; }, 'Nadie cumple años hoy') +
     (p.cumpleProx.length ? '<p class="muted">Próximos 7 días</p>' + lista(p.cumpleProx, function (x) { return '<li><span>' + esc(x.nombre) + ' — ' + fFecha(x.fecha) + ' (' + x.edad + ')</span><span class="muted">en ' + x.dias + ' d</span></li>'; }) : '');
 
   $('pnVencer').innerHTML = lista(p.porVencer, function (x) {
@@ -204,27 +332,29 @@ async function ingresoManual() {
 async function ingresar(codigo, metodo) {
   var r = await conCarga(api('registrarIngreso', codigo, metodo));
   if (!r) return;
-  if (!r.ok) { $('inFicha').innerHTML = '<div class="alerta rojo">' + esc(r.msg) + '</div>'; sonido(false); return; }
+  if (!r.ok) { $('inFicha').classList.remove('vacio'); $('inFicha').innerHTML = '<div class="alerta rojo">' + esc(r.msg) + '</div>'; sonido(false); return; }
   mostrarFicha(r.ficha, $('inFicha'), r.aviso);
   sonido(r.ficha.estado === 'ACTIVA');
 }
 
 function mostrarFicha(f, el, aviso) {
+  el.classList.remove('vacio');
   var ok = f.estado === 'ACTIVA';
-  var banner = ok ? '<div class="banner verde">✅ ACCESO PERMITIDO</div>'
-    : f.estado === 'VENCIDA' ? '<div class="banner rojo">⛔ MEMBRESÍA VENCIDA</div>'
-    : f.estado === 'PROGRAMADA' ? '<div class="banner gris">🕒 SU PLAN INICIA EL ' + fFecha(f.fechaIngreso) + '</div>'
-    : '<div class="banner rojo">⛔ SIN PLAN ACTIVO</div>';
+  var banner = ok ? '<div class="banner verde">Acceso permitido</div>'
+    : f.estado === 'VENCIDA' ? '<div class="banner rojo">Membresía vencida</div>'
+    : f.estado === 'PROGRAMADA' ? '<div class="banner gris">Su plan inicia el ' + fFecha(f.fechaIngreso) + '</div>'
+    : '<div class="banner rojo">Sin plan activo</div>';
   el.innerHTML = banner +
     (aviso ? '<div class="alerta amarillo">' + esc(aviso) + '</div>' : '') +
-    (f.cumpleHoy ? '<div class="banner cumple">🎂 ¡FELIZ CUMPLEAÑOS, ' + esc(f.nombre.split(' ')[0].toUpperCase()) + '!</div>' : '') +
-    '<div class="ficha"><div class="ficha-foto">' + (f.foto ? '<img src="' + f.foto + '" alt="">' : '<div class="sin-foto">👤</div>') + '</div>' +
+    (f.cumpleHoy ? '<div class="banner cumple">¡Feliz cumpleaños, ' + esc(f.nombre.split(' ')[0]) + '!</div>' : '') +
+    (f.autorizaDatos === false ? '<div class="alerta amarillo">Falta firmar la política de datos. <button class="enlace" onclick="irARegistro(\'' + esc(f.cedula) + '\')">Firmar ahora</button></div>' : '') +
+    '<div class="ficha"><div class="ficha-foto">' + (f.foto ? '<img src="' + f.foto + '" alt="">' : '<div class="sin-foto">Sin foto</div>') + '</div>' +
     '<div class="ficha-datos"><div class="ficha-nombre">' + esc(f.nombre) + '</div>' +
     '<div class="muted">CC ' + esc(f.cedula) + (f.edad !== '' ? ' · ' + f.edad + ' años' : '') + '</div>' +
     '<table class="mini">' + fila('Plan', f.plan) + fila('Fecha ingreso', fFecha(f.fechaIngreso)) + fila('Fecha terminación', fFecha(f.fechaTerminacion)) +
     '<tr><th>Días</th><td><span class="dias ' + f.color + '">' + esc(diasTxt(f.dias)) + '</span></td></tr>' +
     fila('Posición', f.posicion) + fila('Vendedor', f.vendedor) + fila('Comentarios', f.comentarios || f.comentarioPago) + '</table></div></div>' +
-    (!ok ? '<button class="btn btn-yellow" onclick="irAPago(\'' + esc(f.cedula) + '\')">💵 Renovar ahora</button>' : '');
+    (!ok ? '<button class="btn btn-naranja" onclick="irAPago(\'' + esc(f.cedula) + '\')">Renovar ahora</button>' : '');
 }
 
 function sonido(ok) {
@@ -249,8 +379,15 @@ var Cam = {
       Cam.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
       video.srcObject = Cam.stream;
       await video.play();
+      Cam.error = '';
       return true;
-    } catch (e) { console.warn('Cámara:', e); Cam.stream = null; return false; }
+    } catch (e) {
+      // Algunos equipos no aceptan la resolución pedida: se intenta con la básica
+      if (e && e.name === 'OverconstrainedError') {
+        try { Cam.stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false }); video.srcObject = Cam.stream; await video.play(); Cam.error = ''; return true; } catch (e2) { e = e2; }
+      }
+      console.warn('Cámara:', e); Cam.stream = null; Cam.error = GymAPI.motivoCamara(e); return false;
+    }
   },
   cerrar: function () {
     if (Cam.stream) { Cam.stream.getTracks().forEach(function (t) { t.stop(); }); Cam.stream = null; }
@@ -329,7 +466,7 @@ async function reconocer(canvas) {
   var det = await faceapi.detectSingleFace(canvas, opcionesDetector()).withFaceLandmarks().withFaceDescriptor();
   if (!det) { $('inFaceMsg').textContent = 'Buscando rostro…'; return null; }
   var best = S.matcher.findBestMatch(det.descriptor);
-  if (best.label === 'unknown') { $('inFaceMsg').textContent = '❓ Rostro no reconocido'; return null; }
+  if (best.label === 'unknown') { $('inFaceMsg').textContent = 'Rostro no reconocido'; return null; }
   return best;
 }
 
@@ -340,8 +477,8 @@ async function iniciarFacial() {
   var msg = $('inFaceMsg');
   msg.textContent = 'Abriendo cámara…';
   var ok = await Cam.abrir($('inVideo'));
-  if (!ok) { msg.textContent = 'No se pudo abrir la cámara. Use el botón "Foto".'; return; }
-  $('btnFacial').textContent = '⏹️ Detener';
+  if (!ok) { msg.textContent = Cam.error || 'No se pudo abrir la cámara. Use "Usar una foto".'; toast(Cam.error || 'No se pudo abrir la cámara', 'err'); return; }
+  $('btnFacial').textContent = 'Detener reconocimiento';
   msg.textContent = 'Cargando reconocimiento facial…';
   try {
     var n = await prepararMatcher();
@@ -357,7 +494,7 @@ function detenerFacial() {
   S.escaneando = false;
   clearTimeout(S.tFacial);
   Cam.cerrar();
-  if ($('btnFacial')) $('btnFacial').textContent = '📷 Iniciar reconocimiento';
+  if ($('btnFacial')) $('btnFacial').textContent = 'Iniciar reconocimiento';
   if ($('inFaceMsg')) $('inFaceMsg').textContent = 'Cámara apagada';
 }
 
@@ -369,7 +506,7 @@ async function bucleFacial() {
       var r = await reconocer(Cam.capturar(v, 480));
       if (r && S.escaneando) {
         S.escaneando = false;
-        $('inFaceMsg').textContent = '✅ ' + (S.nombres[r.label] || r.label) + ' (' + Math.round((1 - r.distance) * 100) + '%)';
+        $('inFaceMsg').textContent = 'Reconocido: ' + (S.nombres[r.label] || r.label) + ' (' + Math.round((1 - r.distance) * 100) + '%)';
         await ingresar(r.label, 'FACIAL');
         S.tFacial = setTimeout(function () {
           if (Cam.stream && S.tab === 'ingreso') { S.escaneando = true; $('inFaceMsg').textContent = 'Buscando rostro…'; bucleFacial(); }
@@ -402,21 +539,16 @@ async function facialDesdeArchivo(input) {
 /* =====================================================================
  *  MIEMBROS
  * ===================================================================== */
-async function cargarMiembros() {
-  var l = await conCarga(api('listarMiembros'));
-  if (!l) return;
-  S.miembros = l;
-  filtrarMiembros();
-}
+function cargarMiembros() { return rapido('miembros', 'listarMiembros', [], function (l) { S.miembros = l; filtrarMiembros(); }); }
 
 function filtrarMiembros() {
   var q = norm($('mBuscar').value);
   var l = S.miembros.filter(function (m) { return !q || norm(m.nombre).indexOf(q) >= 0 || m.cedula.indexOf(q) >= 0; });
   $('mCount').textContent = '(' + l.length + ')';
-  $('mTabla').innerHTML = '<thead><tr><th>Cédula</th><th>Nombre</th><th>Edad</th><th>Teléfono</th><th>Vence</th><th>Días</th><th title="Rostro">😀</th><th title="Huella">☝️</th></tr></thead><tbody>' +
+  $('mTabla').innerHTML = '<thead><tr><th>Cédula</th><th>Nombre</th><th>Edad</th><th>Teléfono</th><th>Vence</th><th>Días</th><th>Datos</th><th>Rostro</th><th>Huella</th></tr></thead><tbody>' +
     l.slice(0, 400).map(function (m) {
       return '<tr onclick="cargarMiembro(\'' + m.cedula + '\')"><td>' + esc(m.cedula) + '</td><td>' + esc(m.nombre) + '</td><td>' + esc(m.edad) + '</td><td>' + esc(m.telefono) +
-        '</td><td>' + fFecha(m.fin) + '</td><td><span class="dias ' + m.color + '">' + esc(m.estado === 'SIN PLAN' ? 'Sin plan' : diasTxt(m.dias)) + '</span></td><td>' + (m.rostro ? '✅' : '—') + '</td><td>' + (m.huella ? '✅' : '—') + '</td></tr>';
+        '</td><td>' + fFecha(m.fin) + '</td><td><span class="dias ' + m.color + '">' + esc(m.estado === 'SIN PLAN' ? 'Sin plan' : diasTxt(m.dias)) + '</span></td><td>' + (m.aut ? '<span class="badge verde">Firmó</span>' : '<span class="badge amarillo">Pendiente</span>') + '</td><td>' + (m.rostro ? 'Sí' : '—') + '</td><td>' + (m.huella ? 'Sí' : '—') + '</td></tr>';
     }).join('') + '</tbody>';
 }
 
@@ -427,7 +559,7 @@ async function cargarMiembro(ced, desdeInput) {
   cargando(true);
   try { f = await api('buscarMiembro', ced); } catch (e) { toast(e.message, 'err'); return; } finally { cargando(false); }
   if (!f) {
-    if (desdeInput) { $('mTitulo').textContent = 'Nuevo miembro'; $('mPagos').innerHTML = ''; toast('Cédula nueva: complete los datos'); }
+    if (desdeInput) { $('mTitulo').textContent = 'Nuevo socio'; $('mPagos').innerHTML = ''; toast('Cédula nueva: complete los datos'); }
     return;
   }
   rellenarMiembro(f);
@@ -436,20 +568,22 @@ async function cargarMiembro(ced, desdeInput) {
 
 function rellenarMiembro(f) {
   Cam.cerrar(); S.fotoNueva = ''; S.descNuevo = null;
-  $('mTitulo').textContent = 'Editar: ' + f.nombre;
+  $('mTitulo').textContent = f.nombre;
   $('mCedula').value = f.cedula; $('mNombre').value = f.nombre; $('mFnac').value = f.fechaNacimiento;
   $('mTel').value = f.telefono; $('mCorreo').value = f.correo; $('mHuella').value = f.idHuella; $('mComent').value = f.comentarios;
   mostrarFotoMiembro(f.foto);
   setRostro(f.tieneRostro ? 'verde' : 'gris', f.tieneRostro ? 'Rostro registrado ✓' : 'Sin rostro registrado');
   S.miembroActual = f;
+  S.actualizandoPolitica = false;
+  pintarPolitica(f);
   if (f.rutinaId && !S.rutinas.some(function (r) { return r.id === f.rutinaId; })) S.rutinas.push({ id: f.rutinaId, nombre: '(rutina inactiva)' });
   llenarSelectRutinas();
   $('mRutina').value = f.rutinaId || '';
-  var est = { PERSONAL: '✅ Activa (ya creó su PIN)', TEMPORAL: '⏳ PIN temporal entregado, vence ' + fFecha(f.vencePin),
-    TEMPORAL_VENCIDO: '⚠️ El PIN temporal venció, genere uno nuevo', SIN_PIN: '🔒 Aún no tiene acceso' }[f.acceso] || '—';
+  var est = { PERSONAL: 'Activa: ya creó su contraseña', TEMPORAL: 'Contraseña temporal entregada' + (f.vencePin ? ', vence ' + fFecha(f.vencePin) : ''),
+    TEMPORAL_VENCIDO: 'La contraseña temporal venció: entregue una nueva', SIN_PIN: 'Aún no tiene acceso' }[f.acceso] || '—';
   $('mAppEstado').textContent = est + (f.sesiones ? ' · ' + f.sesiones + ' entrenos (último ' + fFecha(f.ultimaSesion) + ')' : '');
   $('mBtnPin').classList.remove('hidden');
-  $('mBtnPin').textContent = f.acceso === 'SIN_PIN' ? '🔑 Generar PIN de acceso' : '🔑 Restablecer PIN';
+  $('mBtnPin').textContent = f.acceso === 'SIN_PIN' ? 'Dar contraseña de acceso' : 'Restablecer contraseña';
   renderProgresoMiembro(f.medidas || []);
   $('mPagos').innerHTML = '<p>Estado: <span class="dias ' + f.color + '">' + esc(f.estado) + (f.fechaTerminacion ? ' · vence ' + fFecha(f.fechaTerminacion) : '') + '</span></p>' +
     (f.pagos && f.pagos.length ? '<div class="tabla-wrap"><table class="tabla"><thead><tr><th>Plan</th><th>Ingreso</th><th>Terminación</th><th>Valor</th><th>Medio</th><th>Vendedor</th></tr></thead><tbody>' +
@@ -460,11 +594,12 @@ function rellenarMiembro(f) {
 function limpiarMiembro() {
   Cam.cerrar(); S.fotoNueva = ''; S.descNuevo = null;
   ['mCedula', 'mNombre', 'mFnac', 'mTel', 'mCorreo', 'mHuella', 'mComent'].forEach(function (id) { $(id).value = ''; });
-  $('mTitulo').textContent = 'Nuevo miembro';
+  $('mTitulo').textContent = 'Nuevo socio';
   $('mPagos').innerHTML = '';
   S.miembroActual = null;
   $('mRutina').value = ''; $('mAppEstado').textContent = 'se crea al guardar a la persona'; $('mBtnPin').classList.add('hidden');
   $('mProgreso').classList.add('hidden');
+  pintarPolitica(null);
   mostrarFotoMiembro('');
   setRostro('gris', 'Sin rostro registrado');
   $('mCedula').focus();
@@ -475,12 +610,51 @@ function mostrarFotoMiembro(src) {
   else { $('mFoto').removeAttribute('src'); $('mFoto').classList.add('hidden'); $('mVideo').classList.remove('hidden'); }
 }
 
+/* ---------- Política de tratamiento de datos ---------- */
+function pintarPolitica(f) {
+  $('mPolAcepta').checked = false; $('mPolSensibles').checked = false;
+  if (window.FirmaM) FirmaM.borrar();
+  var est = $('mPolEstado');
+  if (f && f.autorizaDatos) {
+    est.className = 'pol-estado verde';
+    est.innerHTML = '<svg><use href="#i-escudo"/></svg><span>Firmó la política de datos' + (f.autorizaSensibles ? ', con datos sensibles' : ', sin datos sensibles (sin foto, rostro, huella ni medidas)') +
+      '</span><button type="button" class="enlace" onclick="actualizarPolitica()">Firmar de nuevo o cambiar su decisión</button>';
+    $('mPolForm').classList.add('hidden');
+  } else {
+    est.className = 'pol-estado' + (f ? ' amarillo' : '');
+    est.innerHTML = f ? '<span>Esta persona aún no ha firmado la política de datos vigente.</span>' : '';
+    $('mPolForm').classList.remove('hidden');
+    setTimeout(function () { FirmaM.ajustar(); }, 30);
+  }
+}
+function actualizarPolitica() {
+  S.actualizandoPolitica = true;
+  $('mPolForm').classList.remove('hidden');
+  $('mPolEstado').innerHTML = '<span>Al guardar se registra la nueva firma y la decisión sobre los datos sensibles.</span>';
+  $('mPolEstado').className = 'pol-estado gris';
+  setTimeout(function () { FirmaM.ajustar(); }, 30);
+}
+async function verPolitica() {
+  if (!S.politica) S.politica = await conCarga(llamar('politica', [], false));
+  if (!S.politica) return;
+  $('polTexto').textContent = S.politica.texto;
+  $('polVer').textContent = 'Versión ' + S.politica.version;
+  $('mPolitica').classList.remove('hidden');
+}
+function irARegistro(ced, nombre) {
+  mostrarTab('miembros');
+  limpiarMiembro();
+  $('mCedula').value = String(ced || '');
+  if (nombre) $('mNombre').value = nombre;
+  if (ced) cargarMiembro(ced, true);
+}
+
 function setRostro(color, txt) { var b = $('mRostro'); b.className = 'badge ' + color; b.textContent = txt; }
 
 async function mAbrirCam() {
   mostrarFotoMiembro('');
   var ok = await Cam.abrir($('mVideo'));
-  if (!ok) toast('No se pudo abrir la cámara. Use "Subir / tomar foto".', 'err');
+  if (!ok) toast(Cam.error || 'No se pudo abrir la cámara. Use "Subir o tomar foto".', 'err');
   else cargarFaceApi().catch(function () { });
 }
 
@@ -507,7 +681,7 @@ async function procesarFotoMiembro(canvas) {
     var d = await descriptorDe(canvas);
     S.descNuevo = d;
     if (d) setRostro('verde', 'Rostro detectado ✓ (se guardará)');
-    else setRostro('rojo', '⚠ No se detectó rostro. Tome otra foto de frente y con buena luz.');
+    else setRostro('rojo', 'No se detectó rostro. Tome otra foto de frente y con buena luz.');
   } catch (e) { setRostro('rojo', e.message); }
 }
 
@@ -518,10 +692,26 @@ async function guardarMiembro() {
     RutinaId: $('mRutina').value
   };
   if (!d.Cedula.trim() || !d.Nombre.trim()) return toast('Cédula y nombre son obligatorios', 'err');
+  var m = S.miembroActual, pideFirma = !m || !m.autorizaDatos || S.actualizandoPolitica;
+  var sensibles = m && m.autorizaDatos && !S.actualizandoPolitica ? m.autorizaSensibles : $('mPolSensibles').checked;
+  if (pideFirma) {
+    var marcoAlgo = $('mPolAcepta').checked || !FirmaM.vacia();
+    if (!m || marcoAlgo) {
+      if (!$('mPolAcepta').checked) { $('bloquePolitica').scrollIntoView({ behavior: 'smooth', block: 'center' }); return toast('La persona debe aceptar la política de tratamiento de datos', 'err'); }
+      if (FirmaM.vacia()) { $('bloquePolitica').scrollIntoView({ behavior: 'smooth', block: 'center' }); return toast('Falta la firma de la persona en el recuadro', 'err'); }
+      d.autorizacion = { datos: true, sensibles: $('mPolSensibles').checked, firma: FirmaM.imagen() };
+    }
+  }
+  var huellaNueva = d.IdHuella.trim() && (!m || d.IdHuella.trim() !== (m.idHuella || ''));
+  if ((S.fotoNueva || S.descNuevo || huellaNueva) && !sensibles) {
+    return toast('Para guardar foto, rostro o huella la persona debe autorizar sus datos sensibles (casilla opcional de la política).', 'err');
+  }
   if (S.fotoNueva) d.fotoBase64 = S.fotoNueva;
   if (S.descNuevo) d.descriptor = S.descNuevo;
   var f = await conCarga(api('guardarMiembro', d));
   if (!f) return;
+  S.actualizandoPolitica = false;
+
   toast('Guardado: ' + f.nombre + (d.FechaNacimiento ? '' : ' (falta fecha de nacimiento)'), 'ok');
   S.matcher = null;
   rellenarMiembro(f);
@@ -529,12 +719,12 @@ async function guardarMiembro() {
   if (f.pinNuevo) { mostrarAcceso(f.pinNuevo); rellenarMiembro(Object.assign(f, { acceso: 'TEMPORAL', vencePin: f.pinNuevo.vence })); }
 }
 
-/* ---------- Acceso a la app de socios (PIN) ---------- */
+/* ---------- Acceso a la app de socios (contraseña temporal) ---------- */
 function mensajeAcceso(x) {
   return 'Hola ' + String(x.nombre).split(' ')[0] + ' 👋\nYa tienes acceso a la app de ' + S.cfg.GYM_NOMBRE +
     ' para ver tus rutinas, anotar tus entrenamientos y seguir tu progreso 💪\n\n' +
-    '📲 Entra aquí: ' + S.urlSocio + '\n🪪 Cédula: ' + x.cedula + '\n🔑 PIN temporal: ' + x.pin + ' (vence el ' + fFecha(x.vence) + ')\n\n' +
-    'Al entrar crearás tu PIN personal de 6 números. No compartas tu PIN con nadie.';
+    '📲 Entra aquí: ' + S.urlSocio + '\n🪪 Cédula: ' + x.cedula + '\n🔑 Contraseña temporal: ' + (x.clave || x.pin) + ' (vence el ' + fFecha(x.vence) + ')\n\n' +
+    'Al entrar crearás tu propia contraseña. No la compartas con nadie.';
 }
 
 function mostrarAcceso(x) {
@@ -550,7 +740,7 @@ function mostrarAcceso(x) {
 async function darPin() {
   var f = S.miembroActual;
   if (!f) return;
-  if (f.acceso === 'PERSONAL' && !confirm('El socio ya tiene su PIN personal. Si lo restablece, se cerrará su sesión y deberá usar el nuevo PIN temporal. ¿Continuar?')) return;
+  if (f.acceso === 'PERSONAL' && !confirm('El socio ya tiene su contraseña. Si la restablece, se cerrará su sesión y deberá entrar con la nueva contraseña temporal. ¿Continuar?')) return;
   var x = await conCarga(api('generarPinSocio', f.cedula));
   if (!x) return;
   mostrarAcceso(x);
@@ -559,13 +749,13 @@ async function darPin() {
 }
 
 async function darAccesoTodos() {
-  if (!confirm('Se creará un PIN temporal para cada socio ACTIVO que aún no tiene acceso a la app. ¿Continuar?')) return;
+  if (!confirm('Se creará una contraseña temporal para cada socio ACTIVO que aún no tiene acceso a la app. ¿Continuar?')) return;
   var l = await conCarga(api('generarPinsMasivo'));
   if (!l) return;
   if (!l.length) return toast('Todos los socios activos ya tienen acceso', 'ok');
-  S.listaMasiva = l.map(function (x) { return x.nombre + ' · CC ' + x.cedula + ' · PIN ' + x.pin + ' · vence ' + fFecha(x.vence); }).join('\n');
+  S.listaMasiva = l.map(function (x) { return x.nombre + ' - CC ' + x.cedula + ' - contraseña temporal ' + (x.clave || x.pin) + ' - vence ' + fFecha(x.vence); }).join('\n');
   $('mMasCant').textContent = '(' + l.length + ')';
-  $('mMasTabla').innerHTML = '<thead><tr><th>Nombre</th><th>Cédula</th><th>PIN</th><th>Enviar</th></tr></thead><tbody>' +
+  $('mMasTabla').innerHTML = '<thead><tr><th>Nombre</th><th>Cédula</th><th>Contraseña temporal</th><th>Enviar</th></tr></thead><tbody>' +
     l.map(function (x) {
       return '<tr><td>' + esc(x.nombre) + '</td><td>' + esc(x.cedula) + '</td><td><b style="letter-spacing:2px">' + esc(x.pin) + '</b></td><td>' +
         (wa(x.telefono, mensajeAcceso(x)) || '<span class="muted">sin celular</span>') + '</td></tr>';
@@ -634,7 +824,7 @@ async function pBuscar() {
   try { f = await api('buscarMiembro', c); } catch (e) { toast(e.message, 'err'); return; } finally { cargando(false); }
   if (!f) {
     $('pNombre').value = ''; $('pTel').value = ''; $('pFnac').value = '';
-    $('pEstado').innerHTML = '<span class="badge amarillo">Persona nueva: se creará al registrar el pago</span>';
+    $('pEstado').innerHTML = '<span class="badge amarillo">Persona no registrada</span> Primero regístrela: allí acepta y firma la política de datos. <button class="btn btn-marino btn-sm" onclick="irARegistro($(\'pCedula\').value, $(\'pNombre\').value)">Ir al registro</button>';
     $('pInicio').value = hoyISO(); pCalcFin(); $('pNombre').focus();
     return;
   }
@@ -654,6 +844,7 @@ async function registrarPago() {
   var r = await conCarga(api('registrarPago', d));
   if (!r) return;
   toast(r.msg, 'ok');
+
   if (r.pinNuevo) mostrarAcceso(r.pinNuevo);
   ['pCedula', 'pNombre', 'pTel', 'pFnac', 'pComent'].forEach(function (id) { $(id).value = ''; });
   $('pEstado').innerHTML = '';
@@ -682,7 +873,7 @@ function irAMiembro(ced) { mostrarTab('miembros'); cargarMiembro(ced); }
 /* =====================================================================
  *  TIENDA
  * ===================================================================== */
-async function cargarTienda() { var t = await conCarga(api('tienda')); if (t) renderTienda(t); }
+function cargarTienda() { return rapido('tienda', 'tienda', [], renderTienda); }
 
 function renderTienda(t) {
   S.productos = t.productos;
@@ -769,10 +960,10 @@ function renderInforme(r) {
   }).join('') + '</div></div>';
 
   h += '<div class="grid2">' +
-    '<div class="card"><h3>⏳ Próximos a vencer (hoy en adelante)</h3>' + lista(r.porVencer, function (x) { return '<li><span><b>' + esc(x.nombre) + '</b> — ' + fFecha(x.fin) + ' <span class="dias rojo">' + x.dias + ' d</span></span>' + wa(x.telefono, msgVence(x)) + '</li>'; }, 'Nadie') + '</div>' +
-    '<div class="card"><h3>❌ Vencieron en el mes y no renovaron</h3>' + lista(r.vencidosSinRenovar, function (x) { return '<li><span><b>' + esc(x.nombre) + '</b> — venció ' + fFecha(x.fin) + '</span>' + wa(x.telefono, msgVencido(x)) + '</li>'; }, 'Nadie') + '</div>' +
-    '<div class="card"><h3>🎂 Cumpleaños del mes</h3>' + lista(r.cumpleanos, function (x) { return '<li><span><b>' + x.dia + '</b> — ' + esc(x.nombre) + ' (' + x.edad + ' años)</span>' + wa(x.telefono, msgCumple(x)) + '</li>'; }, 'Nadie cumple este mes (o faltan fechas de nacimiento)') + '</div>' +
-    '<div class="card"><h3>🏆 Más constantes del mes</h3>' + lista(a.top, function (x) { return '<li><span>' + esc(x.nombre) + '</span><b>' + x.veces + ' días</b></li>'; }, 'Sin asistencias') + '</div>' +
+    '<div class="card"><h3>Próximos a vencer (hoy en adelante)</h3>' + lista(r.porVencer, function (x) { return '<li><span><b>' + esc(x.nombre) + '</b> — ' + fFecha(x.fin) + ' <span class="dias rojo">' + x.dias + ' d</span></span>' + wa(x.telefono, msgVence(x)) + '</li>'; }, 'Nadie') + '</div>' +
+    '<div class="card"><h3>Vencieron en el mes y no renovaron</h3>' + lista(r.vencidosSinRenovar, function (x) { return '<li><span><b>' + esc(x.nombre) + '</b> — venció ' + fFecha(x.fin) + '</span>' + wa(x.telefono, msgVencido(x)) + '</li>'; }, 'Nadie') + '</div>' +
+    '<div class="card"><h3>Cumpleaños del mes</h3>' + lista(r.cumpleanos, function (x) { return '<li><span><b>' + x.dia + '</b> — ' + esc(x.nombre) + ' (' + x.edad + ' años)</span>' + wa(x.telefono, msgCumple(x)) + '</li>'; }, 'Nadie cumple este mes (o faltan fechas de nacimiento)') + '</div>' +
+    '<div class="card"><h3>Más constantes del mes</h3>' + lista(a.top, function (x) { return '<li><span>' + esc(x.nombre) + '</span><b>' + x.veces + ' días</b></li>'; }, 'Sin asistencias') + '</div>' +
     '</div>';
   $('iContenido').innerHTML = h;
 }
@@ -797,7 +988,7 @@ function renderListaRutinas() {
     return '<div class="rut-item' + (r.activo ? '' : ' inactiva') + (r.id === sel ? ' sel' : '') + '" onclick="editarRutina(\'' + esc(r.id) + '\')">' +
       '<b>' + esc(r.nombre) + '</b>' + (r.activo ? '' : ' <span class="badge gris">Oculta</span>') +
       '<div class="muted">' + esc([r.objetivo, r.nivel, r.dias + ' día(s)', r.ejercicios.length + ' ejercicios'].filter(String).join(' · ')) + '</div>' +
-      '<div class="muted">👥 ' + r.asignados + ' socio(s) con esta rutina</div></div>';
+      '<div class="muted">' + r.asignados + ' socio(s) con esta rutina</div></div>';
   }).join('') : '<p class="muted">Aún no hay rutinas.</p>';
 }
 
