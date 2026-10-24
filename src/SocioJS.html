@@ -261,6 +261,7 @@ function renderRutina() {
   h += lista.map(function (e, i) { return htmlEjercicio(e, i, info, false); }).join('');
   h += S.extras.map(function (e, i) { return htmlEjercicio(e, i, info, true); }).join('');
   h += '<button class="btn btn-os w100" onclick="agregarExtra()">➕ Agregar ejercicio extra</button>';
+  h += htmlComunidadRutinas();
   el.innerHTML = h;
   montarAnimaciones(lista);
   el.querySelectorAll('.ej input[data-campo=nombre]').forEach(function (inp) {
@@ -300,6 +301,70 @@ function htmlEjercicio(e, i, info, extra) {
     '</div></div>';
 }
 
+function htmlComunidadRutinas() {
+  var videos = (S.d && S.d.videosComunidad) || [];
+  var html = '<section class="card comunidad-rutinas"><div class="fila entre"><div><span class="reto-etiqueta">COMUNIDAD KING GYM</span><h3 style="margin:3px 0">Rutinas en video</h3></div><button class="btn btn-os btn-sm" onclick="actualizarVideosComunidad()">Actualizar</button></div>' +
+    '<p class="sub">Comparte una rutina grabada por ti. El administrador la revisa antes de que otros socios puedan verla.</p>';
+  if (videos.length) html += videos.map(function (v) {
+    var id = String(v.id || '').replace(/[^A-Za-z0-9_-]/g, '');
+    var estado = String(v.estado || 'PENDIENTE');
+    var etiqueta = estado === 'APROBADA' ? '<span class="chip verde">Aprobada</span>' : (estado === 'RECHAZADA' ? '<span class="chip rojo">No aprobada</span>' : '<span class="chip amarillo">En revisión</span>');
+    return '<article class="video-comunidad"><div class="fila entre"><b>' + esc(v.nombre) + '</b>' + etiqueta + '</div>' +
+      '<small>' + esc([v.objetivo, v.nivel, v.dias + ' días por semana'].filter(String).join(' · ')) + '</small>' +
+      (v.descripcion ? '<p>' + esc(v.descripcion) + '</p>' : '') +
+      (estado === 'APROBADA' ? '<button class="btn btn-os btn-sm" onclick="reproducirVideoComunidad(\'' + esc(id) + '\')">▶ Ver rutina</button><div id="video-comunidad-' + esc(id) + '"></div>' : '') +
+      '</article>';
+  }).join('');
+  else html += '<p class="muted">Aún no hay videos aprobados. ¡Puedes proponer el primero!</p>';
+  html += '<details class="form-sugerencia"><summary>＋ Grabar o sugerir una rutina</summary><div class="form">' +
+    '<label class="full">Nombre de la rutina<input id="sugNombre" maxlength="80" placeholder="Ej.: Rutina de fuerza en casa"></label>' +
+    '<label>Objetivo<input id="sugObjetivo" maxlength="100" placeholder="Fuerza, resistencia…"></label>' +
+    '<label>Nivel<select id="sugNivel"><option>Todos</option><option>Principiante</option><option>Intermedio</option><option>Avanzado</option></select></label>' +
+    '<label>Días por semana<select id="sugDias">' + [1,2,3,4,5,6,7].map(function (n) { return '<option value="' + n + '">' + n + '</option>'; }).join('') + '</select></label>' +
+    '<label class="full">Descripción<textarea id="sugDescripcion" rows="2" maxlength="500" placeholder="Equipo, consejos y ejercicios incluidos"></textarea></label>' +
+    '<label class="full">Video (MP4, WebM o MOV; máximo 5 MB)<input id="sugVideo" type="file" accept="video/mp4,video/webm,video/quicktime" capture="environment"></label>' +
+    '<label class="consentimiento-video full"><input id="sugAutorizo" type="checkbox"><span>Confirmo que grabé o tengo permiso para compartir este video. Si el administrador lo aprueba, podrán verlo los socios con membresía activa.</span></label>' +
+    '<button class="btn btn-am full" onclick="enviarRutinaSugerida()">Enviar para revisión</button></div></details></section>';
+  return html;
+}
+async function enviarRutinaSugerida() {
+  var archivo = $('sugVideo').files && $('sugVideo').files[0];
+  if (!archivo) return toast('Seleccione un video para enviar.', 'err');
+  if (archivo.size > 5 * 1024 * 1024) return toast('El video debe pesar máximo 5 MB.', 'err');
+  if (!['video/mp4', 'video/webm', 'video/quicktime'].includes(archivo.type)) return toast('Use un video MP4, WebM o MOV.', 'err');
+  if (!$('sugAutorizo').checked) return toast('Confirme que tiene permiso para compartir el video.', 'err');
+  var dataUrl = await new Promise(function (resolve, reject) {
+    var r = new FileReader(); r.onload = function () { resolve(String(r.result).split(',')[1] || ''); };
+    r.onerror = function () { reject(new Error('No se pudo leer el archivo de video.')); }; r.readAsDataURL(archivo);
+  }).catch(function (e) { toast(e.message, 'err'); return ''; });
+  if (!dataUrl) return;
+  var datos = { nombre: $('sugNombre').value, objetivo: $('sugObjetivo').value, nivel: $('sugNivel').value,
+    dias: Number($('sugDias').value), descripcion: $('sugDescripcion').value, tipo: archivo.type, base64: dataUrl, autorizo: true };
+  var lista = await conCarga(api('enviarSugerenciaRutina', datos));
+  if (!lista) return;
+  S.d.videosComunidad = lista;
+  toast('Propuesta enviada. Quedó pendiente de revisión.', 'ok');
+  pintarComunidadRutinas();
+}
+function pintarComunidadRutinas() {
+  var el = document.querySelector('.comunidad-rutinas');
+  if (el) el.outerHTML = htmlComunidadRutinas();
+}
+async function actualizarVideosComunidad() {
+  var lista = await conCarga(api('listarVideosComunidadSocio'));
+  if (!lista) return;
+  S.d.videosComunidad = lista;
+  pintarComunidadRutinas();
+  toast('Videos actualizados', 'ok');
+}
+async function reproducirVideoComunidad(id) {
+  var r = await conCarga(api('verVideoComunidad', id)); if (!r) return;
+  var bin = atob(r.base64), bytes = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  var url = URL.createObjectURL(new Blob([bytes], { type: r.tipo || 'video/mp4' }));
+  var el = $('video-comunidad-' + id); if (!el) { URL.revokeObjectURL(url); return; }
+  el.innerHTML = '<video controls playsinline class="video-rutina"><source src="' + url + '"></video>';
+}
 /* ---------- animaciones ---------- */
 function ejDeCaja(d, lista) {
   return d.dataset.extra === '1' ? S.extras[Number(d.dataset.i)] : lista[Number(d.dataset.i)];
@@ -410,6 +475,7 @@ function htmlElegirRutina() {
   var h = '<h2>' + (d.rutina ? 'Cambiar de rutina' : 'Elija su rutina') + '</h2>' +
     '<p class="sub" style="margin-top:-4px">También puede pedirle a su entrenador que le asigne una.</p>';
   h += htmlRetoSemanal();
+  h += htmlComunidadRutinas();
   if (!d.rutinas.length) h += '<div class="card sub">El gimnasio aún no ha publicado rutinas.</div>';
   h += d.rutinas.map(function (r) {
     var actual = d.rutina && d.rutina.id === r.id;

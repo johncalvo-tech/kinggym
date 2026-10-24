@@ -103,7 +103,19 @@
     .reto-progreso { height:9px; overflow:hidden; border-radius:99px; background:#07152d; margin:8px 0; }
     .reto-progreso i { display:block; height:100%; border-radius:inherit; background:var(--am); transition:width .25s ease; }
 
-    /* Historial / perfil */
+    .comunidad-rutinas { border-color:rgba(244,122,32,.45); }
+    .comunidad-rutinas > .sub { font-size:13px; }
+    .video-comunidad { padding:11px 0; border-top:1px solid var(--borde); }
+    .video-comunidad small { display:block; color:var(--sub); margin-top:5px; }
+    .video-comunidad p { font-size:13px; }
+    .form-sugerencia { margin-top:12px; padding:12px; border-radius:12px; background:var(--card2); }
+    .form-sugerencia summary { cursor:pointer; font-weight:800; color:var(--am); }
+    .form-sugerencia .form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:12px; }
+    .form-sugerencia .full { grid-column:1/-1; }
+    .form-sugerencia input[type=file] { width:100%; font-size:13px; }
+    .consentimiento-video { display:flex; flex-direction:row; align-items:flex-start; gap:9px; font-size:12px; line-height:1.4; }
+    .consentimiento-video input { width:20px; flex:0 0 20px; accent-color:var(--am); }
+    @media (max-width:420px) { .form-sugerencia .form { grid-template-columns:1fr; } .form-sugerencia .full { grid-column:auto; } }    /* Historial / perfil */
     .ses { border-left:3px solid var(--am); padding:4px 0 4px 12px; margin-bottom:14px; }
     .ses .f { font-weight:800; }
     .ses ul { list-style:none; padding:0; margin:6px 0 0; font-size:14px; }

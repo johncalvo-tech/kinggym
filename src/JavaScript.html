@@ -203,7 +203,7 @@ function mostrarTab(t) {
   if (t === 'miembros') cargarMiembros();
   if (t === 'pagos') { if (!$('pMes').value) $('pMes').value = mesActual(); cargarPagosMes(); }
   if (t === 'tienda') cargarTienda();
-  if (t === 'rutinas') cargarRutinas();
+  if (t === 'rutinas') { cargarRutinas(); cargarSugerenciasRutina(); }
   if (t === 'informes' && !$('iMes').value) $('iMes').value = mesActual();
 }
 
@@ -982,6 +982,46 @@ async function cargarRutinas() {
   else if (!$('rNombre').value && !S.filas.length) { if (l.length) editarRutina(l[0].id); else nuevaRutina(); }
 }
 
+var videoRutinaAdminUrl = '';
+async function cargarSugerenciasRutina() {
+  var lista = await conCarga(api('listarSugerenciasRutina'));
+  if (!lista) return;
+  S.sugRutinas = lista;
+  renderSugerenciasRutina();
+}
+function renderSugerenciasRutina() {
+  var el = $('rSugerencias'); if (!el) return;
+  var lista = S.sugRutinas || [];
+  if (!lista.length) { el.innerHTML = '<p class="muted">No hay propuestas pendientes de revisión.</p>'; return; }
+  el.innerHTML = lista.map(function (x) {
+    var id = esc(x.id);
+    return '<article class="sugerencia-admin"><div class="card-cab"><div><b>' + esc(x.nombre) + '</b><div class="muted">' + esc(x.socio) + ' · ' + esc(x.fecha) + '</div></div><span class="badge amarillo">Pendiente</span></div>' +
+      '<p class="muted">' + esc([x.objetivo, x.nivel, x.dias + ' días por semana', x.tipo].filter(String).join(' · ')) + '</p>' +
+      (x.descripcion ? '<p>' + esc(x.descripcion) + '</p>' : '') +
+      '<div id="preview-sug-' + id + '"></div><div class="row"><button class="btn btn-claro btn-sm" onclick="verVideoSugerencia(\'' + id + '\')">▶ Ver video</button>' +
+      '<button class="btn btn-naranja btn-sm" onclick="resolverSugerencia(\'' + id + '\',\'APROBADA\')">Aprobar</button><button class="btn btn-claro btn-sm" onclick="resolverSugerencia(\'' + id + '\',\'RECHAZADA\')">Rechazar</button></div></article>';
+  }).join('');
+}
+async function videoUrlDesdeRespuesta(r) {
+  var bin = atob(r.base64), bytes = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return URL.createObjectURL(new Blob([bytes], { type: r.tipo || 'video/mp4' }));
+}
+async function verVideoSugerencia(id) {
+  var r = await conCarga(api('verVideoSugerenciaAdmin', id)); if (!r) return;
+  if (videoRutinaAdminUrl) URL.revokeObjectURL(videoRutinaAdminUrl);
+  videoRutinaAdminUrl = await videoUrlDesdeRespuesta(r);
+  var el = $('preview-sug-' + id); if (!el) return;
+  el.innerHTML = '<video controls playsinline class="video-rutina"><source src="' + videoRutinaAdminUrl + '"></video>';
+}
+async function resolverSugerencia(id, decision) {
+  var pregunta = decision === 'APROBADA' ? '¿Aprobar y compartir este video con los socios activos?' : '¿Rechazar esta propuesta?';
+  if (!confirm(pregunta)) return;
+  var lista = await conCarga(api('revisarSugerenciaRutina', id, decision));
+  if (!lista) return;
+  S.sugRutinas = lista; renderSugerenciasRutina();
+  toast(decision === 'APROBADA' ? 'Video aprobado para socios activos' : 'Propuesta rechazada', 'ok');
+}
 function renderListaRutinas() {
   var sel = $('rId').value;
   $('rLista').innerHTML = S.rutinasFull.length ? S.rutinasFull.map(function (r) {
@@ -1068,6 +1108,7 @@ function previaAnim(i) {
 
 function agregarFilaEj(nuevoDia) {
   var max = S.filas.reduce(function (m, f) { return Math.max(m, parseInt(f.dia, 10) || 1); }, 0) || 1;
+  if (nuevoDia && max >= 7) return toast('Una rutina puede tener hasta 7 días por semana.', 'err');
   var dia = nuevoDia ? max + (S.filas.length ? 1 : 0) : (S.filas.length ? parseInt(S.filas[S.filas.length - 1].dia, 10) || max : 1);
   S.filas.push({ dia: dia, ejercicio: '', series: '3', reps: '12', descanso: '60s', notas: '', video: '', animacion: '' });
   ordenarFilas();
