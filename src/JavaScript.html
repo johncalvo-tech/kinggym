@@ -55,6 +55,7 @@ window.addEventListener('load', async function () {
   window.FirmaM = GymAPI.firma($('mFirma'));
   $('lgPin').addEventListener('keydown', function (e) { if (e.key === 'Enter') entrar(); });
   $('inCodigo').addEventListener('keydown', function (e) { if (e.key === 'Enter') ingresoManual(); });
+  $('tScan').addEventListener('keydown', function (e) { if (e.key === 'Enter') venderPorCodigo(); });
   try {
     var info = await llamar('infoLogin', [], false);
     $('lgGym').textContent = info.gym;
@@ -880,6 +881,7 @@ function renderTienda(t) {
   var admin = esAdmin();
   var html = t.productos.filter(function (p) { return p.activo || admin; }).map(function (p) {
     return '<div class="prod' + (p.stock <= 0 || !p.activo ? ' agotado' : '') + '"><div class="prod-n">' + esc(p.nombre) + (p.activo ? '' : ' (inactivo)') + '</div><div class="muted">' + esc(p.categoria) + '</div>' +
+      (p.codigoBarras ? '<div class="muted">Código: ' + esc(p.codigoBarras) + '</div>' : '') +
       '<div class="prod-p">' + cop(p.precio) + '</div><div class="muted">Stock: ' + p.stock + '</div><div class="row">' +
       (p.activo && p.stock > 0 ? '<button class="btn btn-yellow btn-sm" onclick="abrirVenta(\'' + p.id + '\')">Vender</button>' : '') +
       (admin ? '<button class="btn btn-light btn-sm" onclick="editarProducto(\'' + p.id + '\')">Editar</button>' : '') + '</div></div>';
@@ -893,16 +895,25 @@ function renderTienda(t) {
 
 function prodPorId(id) { return S.productos.filter(function (p) { return p.id === id; })[0]; }
 
+function venderPorCodigo() {
+  var codigo = $('tScan').value.trim(); $('tScan').value = ''; if (!codigo) return;
+  var p = S.productos.filter(function (x) { return x.codigoBarras === codigo; })[0];
+  if (!p) { $('tCodigoBarras').value = codigo; $('tNombre').focus(); return toast('Código no registrado. Complete los datos del producto y guárdelo.', 'err'); }
+  if (!p.activo) return toast('El producto está inactivo', 'err');
+  if (p.stock <= 0) return toast('Producto agotado: ' + p.nombre, 'err');
+  abrirVenta(p.id);
+}
+
 function editarProducto(id) {
   var p = prodPorId(id); if (!p) return;
-  $('tId').value = p.id; $('tNombre').value = p.nombre; $('tCat').value = p.categoria;
+  $('tId').value = p.id; $('tNombre').value = p.nombre; $('tCodigoBarras').value = p.codigoBarras || ''; $('tCat').value = p.categoria;
   $('tPrecio').value = p.precio; $('tStock').value = p.stock; $('tActivo').checked = p.activo;
   $('tNombre').focus();
 }
-function limpiarProducto() { ['tId', 'tNombre', 'tCat', 'tPrecio', 'tStock'].forEach(function (id) { $(id).value = ''; }); $('tActivo').checked = true; }
+function limpiarProducto() { ['tId', 'tNombre', 'tCodigoBarras', 'tCat', 'tPrecio', 'tStock'].forEach(function (id) { $(id).value = ''; }); $('tActivo').checked = true; }
 
 async function guardarProducto() {
-  var t = await conCarga(api('guardarProducto', { Id: $('tId').value, Nombre: $('tNombre').value, Categoria: $('tCat').value, Precio: $('tPrecio').value, Stock: $('tStock').value, Activo: $('tActivo').checked }));
+  var t = await conCarga(api('guardarProducto', { Id: $('tId').value, Nombre: $('tNombre').value, CodigoBarras: $('tCodigoBarras').value, Categoria: $('tCat').value, Precio: $('tPrecio').value, Stock: $('tStock').value, Activo: $('tActivo').checked }));
   if (!t) return;
   toast('Producto guardado', 'ok'); limpiarProducto(); renderTienda(t);
 }
@@ -1149,3 +1160,6 @@ function copiarLinkSocio() {
   catch (e) { document.execCommand('copy'); toast('Enlace copiado', 'ok'); }
 }
 </script>
+
+
+The focused UI element is 1 AXWebArea 127.0.0.1:8145/JavaScript.html
