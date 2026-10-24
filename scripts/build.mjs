@@ -148,7 +148,7 @@ function cabecera(p) {
 <link rel="manifest" href="${p.manifest}">
 <link rel="icon" type="image/png" href="icons/favicon.png">
 <link rel="apple-touch-icon" href="icons/${p.icono}-apple-180.png">
-<script src="config.js"></script>
+<script src="config.js?v=${VERSION}"></script>
 <script>${GUARDIA}</script>`;
 }
 
